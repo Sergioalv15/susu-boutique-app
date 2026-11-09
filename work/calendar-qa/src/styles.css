@@ -1,0 +1,73 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #e9e4dc;
+}
+
+.qa-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.qa-toolbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #fff;
+  border-bottom: 1px solid #ccc;
+  font: 12px system-ui, sans-serif;
+}
+
+.qa-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qa-actions button {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.qa-route {
+  margin-left: 8px;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qa-calendar {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 600px) {
+  .qa-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .qa-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .qa-route {
+    max-width: 100%;
+  }
+}

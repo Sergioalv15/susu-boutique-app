@@ -1,0 +1,10 @@
+{
+  "createdAt": "2026-09-21T11:59:59.6674968+02:00",
+  "files": [
+    "src/features/daily-records/presentation/screens/CalendarScreen.tsx",
+    "src/features/daily-records/presentation/components/MonthlyCalendar.tsx",
+    "src/features/daily-records/presentation/components/BiweeklyWindow.tsx",
+    "docs/CONTINUITY.md",
+    "src/features/daily-records/presentation/screens/HomeScreen.tsx"
+  ]
+}

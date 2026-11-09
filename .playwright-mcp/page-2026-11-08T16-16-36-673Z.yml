@@ -1,0 +1,70 @@
+- generic [ref=f2e8]:
+  - generic [ref=f2e9]:
+    - generic:
+      - generic [aria-hidden]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Venta
+                    - generic: Hoy · 0,00 € · 0 unidades
+                  - generic:
+                    - generic: Elegí una categoría
+                    - button:
+                      - generic: Anillos
+                    - button:
+                      - generic: Collares
+                    - button:
+                      - generic: Pulseras
+                    - button:
+                      - generic: Pendientes
+    - generic [ref=f2e60]:
+      - generic [ref=f2e61]:
+        - button "Volver" [ref=f2e82] [cursor=pointer]:
+          - generic [ref=f2e83]: ‹ Volver
+        - generic [ref=f2e62]: Agregar stock
+        - generic [ref=f2e63]: Tipo de joya · Precio · Cantidad · Foto
+      - generic [ref=f2e136]:
+        - generic [ref=f2e137]:
+          - generic [ref=f2e138]: Tipo de joya
+          - generic [ref=f2e139]:
+            - button "Anillos" [ref=f2e140] [cursor=pointer]
+            - button "Collares" [ref=f2e142] [cursor=pointer]
+            - button "Pulseras" [ref=f2e144] [cursor=pointer]
+            - button "Pendientes" [ref=f2e146] [cursor=pointer]
+        - generic [ref=f2e148]:
+          - generic [ref=f2e149]: Grupo de precio
+          - generic [ref=f2e150]:
+            - button "3,00 €" [ref=f2e151] [cursor=pointer]
+            - button "5,00 €" [ref=f2e153] [cursor=pointer]
+            - button "7,00 €" [ref=f2e155] [cursor=pointer]
+            - button "Otro precio" [ref=f2e157] [cursor=pointer]
+        - generic [ref=f2e159]: "Este grupo ya existe: sus unidades se sumarán al stock actual (20)."
+        - generic [ref=f2e160]:
+          - generic [ref=f2e161]: Cantidad
+          - textbox "Cantidad de unidades" [ref=f2e162]:
+            - /placeholder: Unidades recibidas
+        - generic [ref=f2e163]:
+          - generic [ref=f2e164]: Foto de ejemplo
+          - generic [ref=f2e165]: Una foto por grupo de precio; no una foto por unidad.
+          - button "Actualizar foto de ejemplo" [ref=f2e169] [cursor=pointer]
+        - button "Guardar stock" [disabled]
+        - button "Cancelar" [ref=f2e172] [cursor=pointer]
+  - tablist [ref=f2e30]:
+    - tab "  Venta" [ref=f2e32] [cursor=pointer]:
+      - generic [ref=f2e33]:
+        - generic [ref=f2e34]: 
+        - generic [ref=f2e36]: 
+      - generic [ref=f2e38]: Venta
+    - tab "  Tienda" [selected] [ref=f2e40] [cursor=pointer]:
+      - generic [ref=f2e41]:
+        - generic [ref=f2e42]: 
+        - generic [ref=f2e44]: 
+      - generic [ref=f2e46]: Tienda
+    - tab "  Logística" [ref=f2e48] [cursor=pointer]:
+      - generic [ref=f2e49]:
+        - generic [ref=f2e50]: 
+        - generic [ref=f2e52]: 
+      - generic [ref=f2e54]: Logística

@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Susu's Boutique",
+    "slug": "appjorge",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "appjorge",
+    "userInterfaceStyle": "light",
+    "platforms": ["ios", "android", "web"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-file-system",
+        {
+          "enableFileSharing": true,
+          "supportsOpeningDocumentsInPlace": true
+        }
+      ],
+      "expo-document-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Susu’s Boutique necesita acceso a tus fotos para guardar una imagen de referencia del grupo de precio.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "android": {
+      "package": "com.appjorge.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.appjorge.mobile",
+      "supportsTablet": true,
+      "usesIcloudStorage": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a2d4a416-7bd0-456e-a2b1-9e0852893716"
+      }
+    },
+    "owner": "sergioalv15"
+  }
+}

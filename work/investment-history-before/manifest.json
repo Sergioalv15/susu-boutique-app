@@ -1,0 +1,14 @@
+{
+  "createdAt": "2026-09-21T13:23:59.2947793+02:00",
+  "files": [
+    "src/features/daily-records/investment/domain/types.ts",
+    "src/features/daily-records/investment/application/InvestmentAdjustmentRepository.ts",
+    "src/features/daily-records/investment/application/InvestmentBalanceService.ts",
+    "src/features/daily-records/investment/application/InvestmentBalanceService.test.ts",
+    "src/features/daily-records/investment/infrastructure/SQLiteInvestmentAdjustmentRepository.ts",
+    "src/features/daily-records/investment/presentation/components/InvestmentBalanceCard.tsx",
+    "src/features/daily-records/investment/presentation/screens/InvestmentBalanceScreen.tsx",
+    "docs/CONTINUITY.md"
+  ],
+  "note": "Pre-edit copies before investment history pagination/filtering and manual adjustment UI changes."
+}

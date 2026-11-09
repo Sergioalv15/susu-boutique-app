@@ -1,0 +1,112 @@
+import groovy.json.JsonSlurper
+import java.math.BigInteger
+import java.security.KeyStore
+
+gradle.beforeProject { project ->
+  if (project.path != ':app') {
+    return
+  }
+
+  def versionText = project.findProperty('appjorgeProductionVersionCode')
+  if (!(versionText instanceof String) || !(versionText ==~ /^\d+$/)) {
+    throw new GradleException('A positive decimal production versionCode is required.')
+  }
+
+  def versionCode = new BigInteger(versionText)
+  if (versionCode < BigInteger.ONE || versionCode > new BigInteger('2100000000')) {
+    throw new GradleException('The production versionCode is outside the supported range.')
+  }
+
+  def rootDirectory = project.rootProject.projectDir.parentFile
+  def credentialsFile = new File(rootDirectory, 'credentials.json')
+  if (!credentialsFile.isFile() || !credentialsFile.canRead()) {
+    throw new GradleException('Readable local production credentials were not found.')
+  }
+
+  def keystore
+  def selectedKeystore
+  try {
+    def credentials = new JsonSlurper().parse(credentialsFile)
+    if (!(credentials instanceof Map) || !(credentials.android instanceof Map) || !(credentials.android.keystore instanceof Map)) {
+      throw new GradleException('Production credentials are incomplete.')
+    }
+
+    keystore = credentials.android.keystore
+    def requiredFields = ['keystorePath', 'keystorePassword', 'keyAlias', 'keyPassword']
+    if (requiredFields.any { !(keystore[it] instanceof String) || keystore[it].trim().isEmpty() }) {
+      throw new GradleException('Production credentials are incomplete.')
+    }
+
+    selectedKeystore = new File(rootDirectory, '@sergioalv15__appjorge.jks').canonicalFile
+    def configuredKeystore = new File(rootDirectory, keystore.keystorePath).canonicalFile
+    def verifyingLocalKey = gradle.startParameter.taskNames.any {
+      it == ':app:verifyLocalProductionKey' || it.endsWith(':verifyLocalProductionKey')
+    }
+    if (configuredKeystore != selectedKeystore && !verifyingLocalKey) {
+      throw new GradleException('credentials.json must point to the selected production keystore.')
+    }
+    if (!selectedKeystore.isFile() || !selectedKeystore.canRead()) {
+      throw new GradleException('A readable production keystore was not found.')
+    }
+  } catch (GradleException error) {
+    throw error
+  } catch (Exception ignored) {
+    throw new GradleException('Production credentials could not be read.')
+  }
+
+  project.pluginManager.withPlugin('com.android.application') {
+    def androidComponents = project.extensions.getByName('androidComponents')
+
+    project.tasks.register('verifyLocalProductionKey') {
+      group = 'verification'
+      description = 'Verifies the local production keystore without printing credentials.'
+
+      doLast {
+        try {
+          def keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
+          selectedKeystore.withInputStream { input ->
+            keyStore.load(input, keystore.keystorePassword.toCharArray())
+          }
+          if (!keyStore.isKeyEntry(keystore.keyAlias)) {
+            throw new GradleException('Local production keystore verification failed.')
+          }
+          if (keyStore.getKey(keystore.keyAlias, keystore.keyPassword.toCharArray()) == null) {
+            throw new GradleException('Local production keystore verification failed.')
+          }
+        } catch (Exception ignored) {
+          throw new GradleException('Local production keystore verification failed.')
+        }
+      }
+    }
+
+    androidComponents.finalizeDsl { android ->
+      def production = android.signingConfigs.findByName('production') ?: android.signingConfigs.create('production')
+      production.storeFile = selectedKeystore
+      production.storePassword = keystore.keystorePassword
+      production.keyAlias = keystore.keyAlias
+      production.keyPassword = keystore.keyPassword
+
+      android.defaultConfig.versionCode = versionCode.intValueExact()
+      android.buildTypes.getByName('release').signingConfig = production
+    }
+
+    project.tasks.register('verifyProductionReleaseConfig') {
+      group = 'verification'
+      description = 'Verifies production release configuration without testing keystore passwords.'
+
+      doLast {
+        def android = project.extensions.getByName('android')
+        def release = android.buildTypes.getByName('release')
+        if (android.defaultConfig.versionCode != versionCode.intValueExact()) {
+          throw new GradleException('The final production versionCode does not match.')
+        }
+        if (release.signingConfig?.name != 'production') {
+          throw new GradleException('Release does not use the production signing configuration.')
+        }
+        if (release.signingConfig.storeFile?.canonicalFile != selectedKeystore) {
+          throw new GradleException('Release does not use the selected production keystore.')
+        }
+      }
+    }
+  }
+}

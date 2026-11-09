@@ -1,0 +1,42 @@
+- generic [ref=e8]:
+  - generic [ref=e9]:
+    - generic:
+      - generic [aria-hidden]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - button:
+                      - generic: ‹ Volver
+                    - generic: Venta
+                  - generic:
+                    - generic: Anillos
+                    - generic: Esta categoría todavía no tiene grupos de precio. Configuralos desde Tienda.
+    - generic [ref=e75]:
+      - generic [ref=e76]:
+        - button "Volver a categorías" [ref=e98] [cursor=pointer]:
+          - generic [ref=e99]: ‹ Categorías
+        - generic [ref=e77]: Tienda
+        - generic [ref=e78]: Productos · Anillos
+      - generic [ref=e100]:
+        - generic [ref=e101]: Todavía no hay grupos de precio. Agregá uno para poder registrar ventas.
+        - button "Añadir grupo de precio" [ref=e102] [cursor=pointer]
+        - button "Ir a Logística para reponer stock" [ref=e104] [cursor=pointer]
+  - tablist [ref=e30]:
+    - tab "  Venta" [ref=e32] [cursor=pointer]:
+      - generic [ref=e33]:
+        - generic [ref=e34]: 
+        - generic [ref=e36]: 
+      - generic [ref=e38]: Venta
+    - tab "  Tienda" [selected] [ref=e40] [cursor=pointer]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: 
+        - generic [ref=e44]: 
+      - generic [ref=e46]: Tienda
+    - tab "  Logística" [ref=e48] [cursor=pointer]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: 
+        - generic [ref=e52]: 
+      - generic [ref=e54]: Logística

@@ -1,0 +1,164 @@
+<div id="jorge-designs" aria-label="Propuestas de diseño para Modas Nicolás">
+  <style>
+    #jorge-designs {color-scheme:light dark;font-family:system-ui,sans-serif;color:light-dark(#26342f,#e4eee8)}
+    #jorge-designs * {box-sizing:border-box}
+    #jorge-designs .directions {display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0 0 14px}
+    #jorge-designs .direction {font:500 14px system-ui;min-height:44px;padding:10px 16px;border:1px solid light-dark(#cbd4ce,#4e5e54);border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+    #jorge-designs .direction[aria-pressed="true"] {background:light-dark(#243b30,#e1eee5);color:light-dark(#fff,#1d3025);border-color:transparent}
+    #jorge-designs .caption {text-align:center;font:400 12px system-ui;margin-bottom:16px;color:light-dark(#59665e,#b3c1b8)}
+    #jorge-designs .phone {--paper:light-dark(#fbfcf9,#17221d);--ink:light-dark(#20392c,#eaf3ed);--secondary:light-dark(#5d6d62,#b3c6b8);--line:light-dark(#dce4dc,#35483b);--wash:light-dark(#eaf1e9,#273c2f);--accent:light-dark(#245d40,#a2d6b4);--onaccent:light-dark(#fff,#15301f);--heading:system-ui,sans-serif;max-width:392px;width:100%;margin:auto;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:24px;overflow:hidden;font:400 15px/1.45 system-ui,sans-serif}
+    #jorge-designs .phone[data-model="cuaderno"] {--paper:light-dark(#faf5eb,#27231c);--ink:light-dark(#382e24,#f5ecdc);--secondary:light-dark(#77624f,#c7b69e);--line:light-dark(#e2d6c3,#4e4436);--wash:light-dark(#f0e4d2,#3b3024);--accent:light-dark(#85492f,#e9b896);--onaccent:light-dark(#fff9ef,#382315);--heading:Georgia,serif;border-radius:12px}
+    #jorge-designs .phone[data-model="esencial"] {--paper:light-dark(#f9fafb,#12171e);--ink:light-dark(#1d2b3b,#edf2f9);--secondary:light-dark(#5e6b7b,#b2becf);--line:light-dark(#d8dfe7,#36404e);--wash:light-dark(#e9eef5,#232d3a);--accent:light-dark(#243f66,#b4cceb);--onaccent:light-dark(#fff,#162c47);border-radius:18px}
+    #jorge-designs .phone button,#jorge-designs .phone input,#jorge-designs .phone textarea {font:inherit}
+    #jorge-designs .phone button {cursor:pointer;color:inherit}
+    #jorge-designs .status {display:flex;justify-content:space-between;align-items:center;padding:14px 24px 6px;font-size:12px}
+    #jorge-designs .status-icons {display:flex;gap:5px;align-items:center}
+    #jorge-designs .status-icons svg {width:14px;height:14px}
+    #jorge-designs .brand {display:flex;justify-content:space-between;align-items:center;padding:17px 24px 8px;gap:12px}
+    #jorge-designs .brand-name {font-family:var(--heading);font-size:17px;font-weight:500}
+    #jorge-designs .brand-note {font-size:11px;color:var(--secondary);margin-top:2px}
+    #jorge-designs .monogram {display:grid;place-items:center;min-width:36px;height:36px;border:1px solid var(--line);border-radius:50%;font-family:var(--heading)}
+    #jorge-designs .body {padding:20px 24px 22px;min-height:530px}
+    #jorge-designs .body h1,#jorge-designs .body h2,#jorge-designs .body p {margin:0}
+    #jorge-designs .body h1 {font:400 29px/1.2 var(--heading);letter-spacing:-.7px}
+    #jorge-designs .body h2 {font:500 16px/1.4 var(--heading)}
+    #jorge-designs .sub {font-size:12px;color:var(--secondary)}
+    #jorge-designs .section {margin-top:24px}
+    #jorge-designs .row {display:flex;justify-content:space-between;align-items:center;gap:12px}
+    #jorge-designs .amount {font-variant-numeric:tabular-nums;white-space:nowrap}
+    #jorge-designs .hero {margin:22px 0 18px;padding:22px 20px;background:var(--wash);border-radius:14px}
+    #jorge-designs .hero .total {font:400 39px/1.2 var(--heading);letter-spacing:-1.4px;margin:8px 0 5px}
+    #jorge-designs .pair {display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:16px;margin-top:16px;border-top:1px solid var(--line)}
+    #jorge-designs .pair .amount {font-size:17px;margin-top:4px}
+    #jorge-designs .main-action {display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:48px;border:0;border-radius:10px;background:var(--accent);color:var(--onaccent)!important;font-weight:500!important;padding:12px 16px}
+    #jorge-designs .main-action svg {width:18px;height:18px}
+    #jorge-designs .secondary-action {display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:10px 8px;border:0;background:transparent;color:var(--accent)!important;font-weight:500!important}
+    #jorge-designs .small-action {display:flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;border:0;background:transparent;padding:8px;color:var(--accent)!important}
+    #jorge-designs .list-row {display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:13px 0;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;min-height:48px}
+    #jorge-designs .list-row svg {width:16px;height:16px;flex-shrink:0}
+    #jorge-designs .list-label {display:flex;gap:9px;align-items:center}
+    #jorge-designs .list-label svg {color:var(--secondary)}
+    #jorge-designs .nav {display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);padding:7px 10px 12px;background:var(--paper)}
+    #jorge-designs .nav button {display:flex;flex-direction:column;align-items:center;gap:4px;min-height:49px;padding:7px 2px;border:0;background:transparent;font-size:11px;color:var(--secondary)}
+    #jorge-designs .nav svg {width:19px;height:19px}
+    #jorge-designs .nav button[aria-current="page"] {color:var(--accent);font-weight:500}
+    #jorge-designs .nav button[aria-current="page"]:after {content:"";width:16px;height:2px;background:var(--accent)}
+    #jorge-designs .ledger-title {display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--ink);padding-bottom:14px;margin-top:8px}
+    #jorge-designs .ledger-title h1 {font-size:36px}
+    #jorge-designs .ledger-total {display:flex;align-items:baseline;justify-content:space-between;padding:19px 0 6px;gap:8px}
+    #jorge-designs .ledger-total strong {font:400 33px var(--heading);letter-spacing:-1px}
+    #jorge-designs .ledger-lines {margin:10px 0 20px}
+    #jorge-designs .ledger-lines .list-row {padding:11px 0}
+    #jorge-designs [data-model="cuaderno"] .main-action {border-radius:4px}
+    #jorge-designs [data-model="cuaderno"] .nav {border-top:1px solid var(--ink)}
+    #jorge-designs .date-block {display:flex;gap:16px;align-items:center;padding-bottom:20px;border-bottom:1px solid var(--line)}
+    #jorge-designs .date-block .day {font-size:60px;line-height:1;letter-spacing:-3px}
+    #jorge-designs .open-state {margin:22px 0 20px}
+    #jorge-designs .open-state h1 {font-size:26px;letter-spacing:-.6px;margin:8px 0 10px}
+    #jorge-designs .state-dot {display:inline-block;width:6px;height:6px;border:1px solid var(--secondary);border-radius:50%;margin-right:7px}
+    #jorge-designs [data-model="esencial"] .main-action {border-radius:5px;background:var(--ink);color:var(--paper)!important}
+    #jorge-designs .quiet-metric {padding:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:24px 0 8px}
+    #jorge-designs .quiet-metric .amount {font-size:27px;letter-spacing:-.7px;margin-top:7px}
+    #jorge-designs .calendar {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin:18px -7px 16px}
+    #jorge-designs .weekday {text-align:center;font-size:11px;color:var(--secondary);padding-bottom:10px}
+    #jorge-designs .calendar button {height:45px;min-width:0;padding:3px 0;border:0;border-radius:9px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:13px;position:relative}
+    #jorge-designs .calendar .outside {color:var(--secondary);opacity:.5}
+    #jorge-designs .calendar .selected {background:var(--accent);color:var(--onaccent)}
+    #jorge-designs .day-mark {height:3px;width:3px;border-radius:50%;background:currentColor}
+    #jorge-designs .empty-mark {height:3px}
+    #jorge-designs .selected-day {padding-top:16px;border-top:1px solid var(--line)}
+    #jorge-designs .selected-day .main-action {margin:15px 0 3px}
+    #jorge-designs .week-list {margin:17px 0}
+    #jorge-designs .week-item {display:flex;align-items:center;gap:16px;min-height:61px;padding:10px;border-bottom:1px solid var(--line);width:100%;background:transparent;border-top:0;border-right:0;border-left:0;text-align:left}
+    #jorge-designs .week-item.selected {background:var(--wash)}
+    #jorge-designs .week-number {font-size:21px;min-width:28px}
+    #jorge-designs .field {display:block;margin-top:17px;font-size:13px}
+    #jorge-designs .field input,#jorge-designs .field textarea {display:block;width:100%;min-width:0;margin-top:7px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:7px;min-height:46px;padding:10px 12px;font-size:16px}
+    #jorge-designs .field textarea {resize:vertical;min-height:70px}
+    #jorge-designs .field-line {display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    #jorge-designs .field-help {display:block;color:var(--secondary);font-size:11px;margin-top:5px}
+    #jorge-designs .computed {padding:14px 0;margin:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    #jorge-designs .computed .row+.row {margin-top:10px}
+    #jorge-designs .computed strong {font-weight:500}
+    #jorge-designs .phone details {margin-top:12px}
+    #jorge-designs .phone summary {cursor:pointer;padding:12px 0;color:var(--accent);font-size:13px}
+    #jorge-designs .notice {font-size:12px;color:var(--secondary);margin-top:12px!important;min-height:18px}
+    #jorge-designs .error {color:light-dark(#992c22,#ffb3a9)}
+    #jorge-designs .form-back {margin-left:-10px}
+    #jorge-designs [data-compact="true"] .body {padding-top:10px;padding-bottom:14px;min-height:485px}
+    #jorge-designs [data-compact="true"] .section {margin-top:16px}
+    #jorge-designs [data-compact="true"] .hero {margin-top:14px;padding:16px}
+    #jorge-designs .footer-note {text-align:center;color:light-dark(#647167,#b5c1b8);font:400 11px system-ui;margin:12px 0 0}
+    @media(max-width:360px){#jorge-designs .body{padding-left:18px;padding-right:18px}#jorge-designs .brand{padding-left:18px;padding-right:18px}#jorge-designs .direction{padding:9px 12px}#jorge-designs .hero{padding:18px 16px}}
+  </style>
+  <div class="directions" role="group" aria-label="Modelos visuales">
+    <button class="direction" data-model-choice="claro" aria-pressed="true">1 · Claro</button>
+    <button class="direction" data-model-choice="cuaderno" aria-pressed="false">2 · Cuaderno</button>
+    <button class="direction" data-model-choice="esencial" aria-pressed="false">3 · Esencial</button>
+  </div>
+  <div class="caption" id="jorge-caption">Sereno · Verde bosque · Resumen primero</div>
+  <section class="phone" data-model="claro" aria-label="Vista de la aplicación" id="jorge-phone">
+    <div class="status"><span>9:41</span><span class="status-icons"><i data-lucide="signal" aria-hidden="true"></i><i data-lucide="wifi" aria-hidden="true"></i><i data-lucide="battery-full" aria-hidden="true"></i></span></div>
+    <div class="brand"><div><div class="brand-name">Modas Nicolás</div><div class="brand-note">Tu negocio, al día</div></div><span class="monogram" aria-hidden="true">N</span></div>
+    <div class="body" id="jorge-screen"></div>
+    <nav class="nav" aria-label="Navegación principal" id="jorge-nav"></nav>
+  </section>
+  <p class="footer-note">Propuesta interactiva · Datos de ejemplo</p>
+  <script>
+  (() => {
+    const root = document.getElementById('jorge-designs');
+    const phone = document.getElementById('jorge-phone');
+    const body = document.getElementById('jorge-screen');
+    const nav = document.getElementById('jorge-nav');
+    const caption = document.getElementById('jorge-caption');
+    const states = ['claro','cuaderno','esencial'];
+    const views = ['home','calendar','balance','more','day','purchase','suppliers','holidays','backup'];
+    const captions = {claro:'Sereno · Verde bosque · Resumen primero',cuaderno:'Editorial · Papel y terracota · Libro de cuentas',esencial:'Preciso · Grafito · La tarea de hoy primero'};
+    const state = {model:'claro',screen:'home',day:21,compact:false,sales:'420',margin:'35',expenses:'22',card:'180',saved:false};
+    const euro = n => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',minimumFractionDigits:2,useGrouping:'always'}).format(n);
+    const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
+    const money = n => `<span class="amount">${euro(n)}</span>`;
+    const action = (label,screen,primary=true) => `<button class="${primary?'main-action':'secondary-action'}" data-screen="${screen}">${primary?icon('plus'):''}${label}</button>`;
+    const row = (label,value,screen) => `<button class="list-row" data-screen="${screen}"><span>${label}</span><span class="row">${value}${icon('chevron-right')}</span></button>`;
+    const plain = (label,value) => `<div class="list-row"><span>${label}</span>${money(value)}</div>`;
+    function home() {
+      if(state.model==='cuaderno') return `<p class="sub">Lunes, 21 de septiembre</p><div class="ledger-title"><h1>Septiembre</h1><span class="sub">2026</span></div><div class="ledger-total"><span>Beneficio neto</span><strong class="amount">2.050,00 €</strong></div><div class="ledger-lines">${plain('Ventas',6840)}${plain('Beneficio bruto',2394)}${plain('Otros gastos',344)}</div>${action(state.saved?'Editar el día':'Registrar el día','day')}<div class="row">${action('Registrar inversión','purchase',false)}<span class="sub">${state.saved?'Registrado':'Hoy, pendiente'}</span></div><div class="section"><h2>Libro del mes</h2>${row('Último registro','19 sept.','calendar')}${row('Disponible para invertir',money(1230),'purchase')}</div>`;
+      if(state.model==='esencial') return `<div class="date-block"><span class="day">21</span><div><div>Lunes</div><p class="sub">Septiembre de 2026</p></div></div><div class="open-state"><p class="sub"><span class="state-dot"></span>${state.saved?'Día registrado':'Sin registrar'}</p><h1>El día, en orden.</h1><p class="sub">Ventas, margen y gastos en un solo registro.</p></div>${action(state.saved?'Editar el día':'Registrar el día','day')}${action('Registrar inversión','purchase',false)}<div class="quiet-metric"><div class="row"><span>Beneficio neto del mes</span><span class="sub">Sept.</span></div><div class="amount">2.050,00 €</div></div>${row('Ver balance del mes',money(6840)+' ventas','balance')}${row('Disponible para invertir',money(1230),'purchase')}<div class="section sub">Último registro · Sábado, 19 de septiembre</div>`;
+      return `<div class="row"><h1>Septiembre</h1><span class="sub">2026</span></div><p class="sub" style="margin-top:6px">Tu mes, de un vistazo</p><div class="hero"><p class="sub">Beneficio neto del mes</p><div class="total amount">2.050,00 €</div><div class="pair"><div><p class="sub">Ventas</p><div class="amount">6.840,00 €</div></div><div><p class="sub">Otros gastos</p><div class="amount">344,00 €</div></div></div></div><div class="row" style="margin-bottom:10px"><span>Hoy · Lunes 21</span><span class="sub">${state.saved?'Registrado':'Sin registrar'}</span></div>${action(state.saved?'Editar el día':'Registrar el día','day')}${action('Registrar inversión','purchase',false)}<div class="section">${row('Disponible para invertir',money(1230),'purchase')}${row('Ver balance del mes','','balance')}</div>`;
+    }
+    function calendar() {
+      const top = `<div class="row"><h1>Septiembre</h1><span class="sub">2026</span></div><div class="row" style="margin-top:12px"><span class="sub">${state.model==='esencial'?'Semana del 21 al 27':'Selecciona un día'}</span><button class="small-action" data-day="21">Hoy</button></div>`;
+      const days = Array.from({length:35},(_,i)=>i===0?31:i<=30?i:i-30);
+      const grid = `<div class="calendar" aria-label="Calendario de septiembre de 2026">${['L','M','X','J','V','S','D'].map(d=>`<span class="weekday">${d}</span>`).join('')}${days.map((d,i)=>{const current=i>0&&i<=30;return `<button ${current?`data-day="${d}"`:'disabled'} class="${!current?'outside ':''}${current&&state.day===d?'selected':''}" aria-label="${d} de ${current?'septiembre':i===0?'agosto':'octubre'}${current&&d<21&&d%7!==6?' · Con registro':''}" aria-pressed="${current&&state.day===d}">${d}<span class="${current&&d<21&&d%7!==6?'day-mark':'empty-mark'}"></span></button>`}).join('')}</div><p class="sub">• Con registro</p>`;
+      const agenda = `<div class="week-list">${['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map((d,i)=>`<button class="week-item ${state.day===21+i?'selected':''}" data-day="${21+i}"><span class="week-number">${21+i}</span><span><span>${d}</span><br><span class="sub">Sin registro</span></span></button>`).join('')}</div>`;
+      return top+(state.model==='esencial'?agenda:grid)+`<div class="selected-day"><div class="row"><h2>${state.day} de septiembre</h2><span class="sub">${state.day<21?'Con registro':'Sin registrar'}</span></div>${action(state.day<21?'Editar el día':'Registrar el día','day')}${action('Registrar inversión','purchase',false)}</div>`;
+    }
+    function day() {return `<div class="row"><button class="small-action form-back" data-screen="calendar" aria-label="Volver al calendario">${icon('arrow-left')}</button><span class="sub">${state.day} septiembre 2026</span></div><h1 style="margin-top:10px">Registrar día</h1><label class="field">Ventas del día (€)<input name="sales" inputmode="decimal" value="${state.sales}" autocomplete="off"></label><div class="field-line"><label class="field">Margen (%)<input name="margin" inputmode="decimal" value="${state.margin}" autocomplete="off"></label><label class="field">Otros gastos (€)<input name="expenses" inputmode="decimal" value="${state.expenses}" autocomplete="off"></label></div><label class="field">Cobrado con tarjeta (€)<input name="card" inputmode="decimal" value="${state.card}" autocomplete="off"><span class="field-help">Parte de las ventas, no se suma de nuevo.</span></label><details><summary>Añadir una nota</summary><label class="field">Nota del día<textarea placeholder="Una devolución, un gasto puntual…"></textarea></label></details><div class="computed"><div class="row sub"><span>Destinado a inversión</span><span class="amount" id="jorge-cost">273,00 €</span></div><div class="row"><strong>Beneficio neto</strong><strong class="amount" id="jorge-net">125,00 €</strong></div></div><button class="main-action" data-save="day">Guardar día</button><p class="notice" id="jorge-form-notice" aria-live="polite">Prueba visual: no modifica tus datos.</p>`}
+    function balance() {return `<div class="row"><h1>Balance</h1><span class="sub">2026</span></div><p class="sub" style="margin-top:8px">Septiembre · Acumulado del mes</p><div class="hero"><p class="sub">Beneficio neto</p><div class="total amount">2.050,00 €</div></div>${plain('Ventas',6840)}${plain('Destinado a inversión',4446)}${plain('Beneficio bruto',2394)}${plain('Otros gastos',344)}<div class="section"><h2>Detalle</h2>${row('Cobrado con tarjeta',money(2720),'calendar')}${row('Ver los días de septiembre','','calendar')}</div>`}
+    function purchase() {return `<div class="row"><button class="small-action form-back" data-screen="home" aria-label="Volver a inicio">${icon('arrow-left')}</button><span class="sub">${state.day} septiembre 2026</span></div><h1 style="margin-top:10px">Registrar inversión</h1><p class="sub" style="margin-top:10px">Disponible para invertir · 1.230,00 €</p><label class="field">Importe (€)<input inputmode="decimal" placeholder="0,00"></label><button class="list-row" data-screen="suppliers"><span>Proveedor</span><span class="sub row">Opcional ${icon('chevron-right')}</span></button><label class="field">Nota<textarea placeholder="¿En qué has invertido?"></textarea></label><div class="section"><button class="main-action" data-demo="Inversión">Guardar inversión</button><p class="notice" aria-live="polite">Prueba visual: no modifica tus datos.</p></div>`}
+    function more() {return `<h1>Tu negocio</h1><div class="section">${row('Proveedores','','suppliers')}${row('Festivos','','holidays')}${row('Copias de seguridad','','backup')}</div><p class="sub" style="margin-top:22px">Las herramientas menos frecuentes, en un solo lugar.</p>`}
+    function secondary() {const title={suppliers:'Proveedores',holidays:'Festivos',backup:'Copias de seguridad'}[state.screen];return `<button class="small-action form-back" data-screen="more" aria-label="Volver a tu negocio">${icon('arrow-left')}</button><h1 style="margin-top:10px">${title}</h1><div class="section">${state.screen==='suppliers'?`<p class="sub">Aún no hay proveedores.</p><div class="section"><button class="main-action" data-demo="Proveedor">Añadir proveedor</button></div>`:state.screen==='holidays'?'<p class="sub">No hay festivos próximos en este ejemplo.</p>':'<p class="sub">Guarda una copia de tus registros.</p><div class="section"><button class="main-action" data-demo="Copia">Exportar copia</button><button class="secondary-action" data-demo="Restauración">Restaurar copia</button></div>'}<p class="notice" aria-live="polite">Prueba visual: no modifica tus datos.</p></div>`}
+    function restore(saved) {const m=saved?.modelContent,p=saved?.privateContent;if(states.includes(m?.design))state.model=m.design;if(views.includes(p?.screen))state.screen=p.screen;if(Number.isInteger(p?.day)&&p.day>=1&&p.day<=30)state.day=p.day;if(typeof p?.compact==='boolean')state.compact=p.compact}
+    function persist() {if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{design:state.model},privateContent:{screen:state.screen,day:state.day,compact:state.compact}}).catch(()=>{})}
+    function calculation() {
+      if(state.screen!=='day')return;
+      if(!body.querySelector('#jorge-gross'))body.querySelector('.computed').insertAdjacentHTML('afterbegin','<div class="row sub"><span>Beneficio bruto</span><span class="amount" id="jorge-gross"></span></div>');
+      const num=v=>Number(String(v).replace(',','.'));
+      const sales=num(state.sales),margin=num(state.margin),expenses=num(state.expenses),card=num(state.card);
+      const valid=[sales,margin,expenses,card].every(Number.isFinite)&&sales>=0&&margin>=0&&margin<=100&&expenses>=0&&card>=0&&card<=sales;
+      body.querySelector('#jorge-gross').textContent=valid?euro(sales*margin/100):'—';
+      body.querySelector('#jorge-cost').textContent=valid?euro(sales*(1-margin/100)):'—';
+      body.querySelector('#jorge-net').textContent=valid?euro(sales*margin/100-expenses):'—';
+      const note=body.querySelector('#jorge-form-notice');
+      note.textContent=valid?'Prueba visual: no modifica tus datos.':'Revisa los importes: la tarjeta no puede superar las ventas.';
+      note.classList.toggle('error',!valid);return valid;
+    }
+    function render() {phone.dataset.model=state.model;phone.dataset.compact=String(state.compact);caption.textContent=captions[state.model];root.querySelectorAll('[data-model-choice]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.modelChoice===state.model)));body.innerHTML=state.screen==='home'?home():state.screen==='calendar'?calendar():state.screen==='day'?day():state.screen==='balance'?balance():state.screen==='purchase'?purchase():state.screen==='more'?more():secondary();const active=state.screen==='day'?'calendar':['suppliers','holidays','backup'].includes(state.screen)?'more':state.screen==='purchase'?'home':state.screen;nav.innerHTML=[['home','house','Inicio'],['calendar','calendar-days','Calendario'],['balance','chart-no-axes-column','Balance'],['more','menu','Más']].map(([view,ico,label])=>`<button data-screen="${view}" ${active===view?'aria-current="page"':''}>${icon(ico)}<span>${label}</span></button>`).join('');if(globalThis.lucide)lucide.createIcons({attrs:{width:18,height:18}});calculation()}
+    restore(window.openai?.widgetState);render();
+    root.addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;if(button.dataset.modelChoice){state.model=button.dataset.modelChoice;render();persist()}else if(button.dataset.screen){state.screen=button.dataset.screen;render();persist()}else if(button.dataset.day){state.day=Number(button.dataset.day);render();persist()}else if(button.dataset.save&&calculation()){state.saved=true;body.querySelector('#jorge-form-notice').textContent='Guardado en la demo. Tus datos reales no cambian.'}else if(button.dataset.demo){const note=body.querySelector('.notice');if(note)note.textContent='Vista de demostración. No se ha realizado ninguna operación.'}});
+    root.addEventListener('input',e=>{if(['sales','margin','expenses','card'].includes(e.target.name)){state[e.target.name]=e.target.value;calculation()}});
+    window.addEventListener('openai:set_globals',e=>{if(e.detail?.globals?.widgetState){restore(e.detail.globals.widgetState);render()}});
+    if(globalThis.Tweak){const tweak=new Tweak({container:phone,onChange:()=>{render();persist()}});tweak.addToggle(state,'compact',{label:'Espaciado compacto'})}
+  })();
+  </script>
+</div>

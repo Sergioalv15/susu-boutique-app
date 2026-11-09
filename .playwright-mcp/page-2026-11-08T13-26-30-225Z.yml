@@ -1,0 +1,82 @@
+- generic [ref=e8]:
+  - generic [ref=e9]:
+    - generic:
+      - generic [aria-hidden]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - button:
+                      - generic: ‹ Volver
+                    - generic: Venta
+                  - generic:
+                    - generic: Anillos
+                    - generic: Esta categoría todavía no tiene grupos de precio. Configuralos desde Tienda.
+    - generic:
+      - generic [aria-hidden]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - button:
+                      - generic: ‹ Categorías
+                    - generic: Tienda
+                    - generic: Productos · Anillos
+                  - generic:
+                    - generic [ref=e114]:
+                      - generic [ref=e115]: 3,00 €
+                      - generic [ref=e116]: 0 unidades disponibles
+                    - button:
+                      - generic: Añadir grupo de precio
+                    - button:
+                      - generic: Ir a Logística para reponer stock
+    - generic [ref=e124]:
+      - generic [ref=e125]:
+        - generic [ref=e126]: Logística
+        - generic [ref=e127]: Entradas y movimientos de stock
+      - generic [ref=e128]:
+        - generic [ref=e129]: Registrar entrada
+        - generic [ref=e130]: Categoría
+        - generic [ref=e131]:
+          - button "Categoría Anillos" [ref=e132] [cursor=pointer]:
+            - generic [ref=e133]: Anillos
+          - button "Categoría Collares" [ref=e134] [cursor=pointer]:
+            - generic [ref=e135]: Collares
+          - button "Categoría Pulseras" [ref=e136] [cursor=pointer]:
+            - generic [ref=e137]: Pulseras
+          - button "Categoría Pendientes" [ref=e138] [cursor=pointer]:
+            - generic [ref=e139]: Pendientes
+        - generic [ref=e140]: Grupo de precio
+        - button "3,00 € · 0 disponibles" [ref=e142] [cursor=pointer]
+        - generic [ref=e144]: Unidades recibidas
+        - textbox "Unidades recibidas" [ref=e145]:
+          - /placeholder: Cantidad
+        - generic [ref=e146]: Proveedor (opcional)
+        - generic [ref=e147]: Podés registrar la entrada sin proveedor.
+        - button "Gestionar proveedores" [ref=e149] [cursor=pointer]
+        - textbox "Nota de la entrada" [ref=e151]:
+          - /placeholder: Nota (opcional)
+        - button "Registrar entrada" [disabled]
+      - generic [ref=e153]:
+        - generic [ref=e154]: Movimientos recientes
+        - generic [ref=e155]: Todavía no hay movimientos de stock.
+  - tablist [ref=e30]:
+    - tab "  Venta" [ref=e32] [cursor=pointer]:
+      - generic [ref=e33]:
+        - generic [ref=e34]: 
+        - generic [ref=e36]: 
+      - generic [ref=e38]: Venta
+    - tab "  Tienda" [ref=e40] [cursor=pointer]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: 
+        - generic [ref=e44]: 
+      - generic [ref=e46]: Tienda
+    - tab "  Logística" [active] [selected] [ref=e48] [cursor=pointer]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: 
+        - generic [ref=e52]: 
+      - generic [ref=e54]: Logística

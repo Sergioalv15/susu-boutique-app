@@ -1,0 +1,34 @@
+Client feedback baseline — 2026-09-21
+
+Existing source files copied before feedback edits:
+- docs/CONTINUITY.md
+- src/features/daily-records/presentation/screens/HomeScreen.tsx
+- src/features/daily-records/presentation/screens/AnnualSummaryScreen.tsx
+- src/core/navigation/MoreScreen.tsx
+- src/features/daily-records/presentation/components/MonthSummaryCard.tsx
+- src/features/daily-records/presentation/components/UpcomingHolidaysCard.tsx
+- src/features/daily-records/investment/presentation/components/InvestmentPurchaseModal.tsx
+- src/features/daily-records/investment/presentation/components/InvestmentBalanceCard.tsx
+- src/features/daily-records/presentation/components/QuickActionRow.tsx
+- src/features/holidays/domain/upcoming.ts
+- src/features/holidays/domain/upcoming.test.ts
+- src/features/holidays/application/upcomingRefresh.ts
+- src/features/holidays/application/upcomingRefresh.test.ts
+- src/features/holidays/application/HolidaySyncService.ts
+- src/features/holidays/application/HolidaySyncService.test.ts
+- src/features/holidays/presentation/hooks/useUpcomingHolidays.ts
+- src/features/daily-records/application/DailyRecordRepository.ts
+- src/features/daily-records/application/DailyRecordService.ts
+- src/features/daily-records/application/DailyRecordService.test.ts
+- src/features/daily-records/infrastructure/SQLiteDailyRecordRepository.ts
+- src/features/daily-records/investment/application/InvestmentBalanceService.test.ts
+- src/features/daily-records/presentation/hooks/dailyRecordForm.test.ts
+
+Reconstructed pre-feedback baseline:
+- app/investment/purchase.tsx — this file was edited before the snapshot list was checked. The baseline was reconstructed from the initially inspected source by reversing only the feedback date/title edits; earlier dirty route code was retained.
+
+New paths introduced by this feedback (no prior source existed):
+- src/features/daily-records/presentation/components/LastDaySummaryCard.tsx
+- src/features/daily-records/presentation/hooks/useMostRecentDailyRecord.ts
+- src/features/daily-records/infrastructure/dailyRecordSql.ts
+- src/features/daily-records/infrastructure/SQLiteDailyRecordRepository.test.ts

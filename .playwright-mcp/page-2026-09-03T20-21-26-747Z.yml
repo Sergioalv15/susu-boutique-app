@@ -1,0 +1,4 @@
+- generic [ref=e4]:
+  - generic [ref=e5]: Algo salió mal.
+  - generic [ref=e6]: Cerrá y volvé a abrir la app para recuperar el estado.
+  - button "Reintentar" [ref=e7] [cursor=pointer]

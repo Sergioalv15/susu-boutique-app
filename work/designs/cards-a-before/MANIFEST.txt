@@ -1,0 +1,5 @@
+src/features/daily-records/presentation/screens/HomeScreen.tsx
+src/features/daily-records/presentation/components/KpiCard.tsx
+src/ui/theme.ts
+docs/CONTINUITY.md
+docs/REDESIGN_CUADERNO.md

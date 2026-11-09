@@ -1,0 +1,50 @@
+- generic [ref=f3e10]:
+  - generic [ref=f3e11]:
+    - generic:
+      - generic [aria-hidden]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Venta
+                    - generic: Hoy · 0,00 € · 0 unidades
+                  - generic:
+                    - generic: Elegí una categoría
+                    - button:
+                      - generic: Anillos
+                    - button:
+                      - generic: Collares
+                    - button:
+                      - generic: Pulseras
+                    - button:
+                      - generic: Pendientes
+    - generic [ref=f3e62]:
+      - generic [ref=f3e63]:
+        - button "Volver" [ref=f3e84] [cursor=pointer]:
+          - generic [ref=f3e85]: ‹ Volver
+        - generic [ref=f3e64]: Grupo 3,00 €
+        - generic [ref=f3e65]: Anillos
+      - generic [ref=f3e97]:
+        - generic [ref=f3e101]: Grupo 3,00 €
+        - generic [ref=f3e102]:
+          - generic [ref=f3e103]: Unidades disponibles
+          - generic [ref=f3e104]: "25"
+        - button "Agregar stock a este grupo" [ref=f3e105] [cursor=pointer]
+  - tablist [ref=f3e32]:
+    - tab "  Venta" [ref=f3e34] [cursor=pointer]:
+      - generic [ref=f3e35]:
+        - generic [ref=f3e36]: 
+        - generic [ref=f3e38]: 
+      - generic [ref=f3e40]: Venta
+    - tab "  Tienda" [selected] [ref=f3e42] [cursor=pointer]:
+      - generic [ref=f3e43]:
+        - generic [ref=f3e44]: 
+        - generic [ref=f3e46]: 
+      - generic [ref=f3e48]: Tienda
+    - tab "  Logística" [ref=f3e50] [cursor=pointer]:
+      - generic [ref=f3e51]:
+        - generic [ref=f3e52]: 
+        - generic [ref=f3e54]: 
+      - generic [ref=f3e56]: Logística

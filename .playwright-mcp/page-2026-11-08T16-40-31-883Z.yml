@@ -1,0 +1,59 @@
+- generic [ref=e10]:
+  - generic [ref=e11]:
+    - generic:
+      - generic [aria-hidden]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Venta
+                    - generic: Hoy · 0,00 € · 0 unidades
+                  - generic:
+                    - generic: Elegí una categoría
+                    - button:
+                      - generic: Anillos
+                    - button:
+                      - generic: Collares
+                    - button:
+                      - generic: Pulseras
+                    - button:
+                      - generic: Pendientes
+    - generic [ref=e62]:
+      - generic [ref=e63]:
+        - generic [ref=e64]: Stock
+        - generic [ref=e65]: Tipos de joya y existencias
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - generic [ref=e68]: Stock por tipo de joya
+          - generic [ref=e69]:
+            - button "Ver stock de Anillos" [ref=e70] [cursor=pointer]:
+              - generic [ref=e71]: Anillos
+              - generic [ref=e72]: 0 unidades · 0 grupos
+            - button "Ver stock de Collares" [ref=e73] [cursor=pointer]:
+              - generic [ref=e74]: Collares
+              - generic [ref=e75]: 0 unidades · 0 grupos
+            - button "Ver stock de Pulseras" [ref=e76] [cursor=pointer]:
+              - generic [ref=e77]: Pulseras
+              - generic [ref=e78]: 0 unidades · 0 grupos
+            - button "Ver stock de Pendientes" [ref=e79] [cursor=pointer]:
+              - generic [ref=e80]: Pendientes
+              - generic [ref=e81]: 0 unidades · 0 grupos
+        - button "Agregar stock" [ref=e82] [cursor=pointer]
+  - tablist [ref=e32]:
+    - tab "  Venta" [ref=e34] [cursor=pointer]:
+      - generic [ref=e35]:
+        - generic [ref=e36]: 
+        - generic [ref=e38]: 
+      - generic [ref=e40]: Venta
+    - tab "  Tienda" [active] [selected] [ref=e42] [cursor=pointer]:
+      - generic [ref=e43]:
+        - generic [ref=e44]: 
+        - generic [ref=e46]: 
+      - generic [ref=e48]: Tienda
+    - tab "  Logística" [ref=e50] [cursor=pointer]:
+      - generic [ref=e51]:
+        - generic [ref=e52]: 
+        - generic [ref=e54]: 
+      - generic [ref=e56]: Logística

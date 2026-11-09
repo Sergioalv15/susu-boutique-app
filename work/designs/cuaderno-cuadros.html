@@ -1,0 +1,169 @@
+<div id="cuaderno-cuadros">
+  <style>
+    #cuaderno-cuadros {
+      --cc-paper: light-dark(#f5f0e7, #211d19);
+      --cc-card: light-dark(#fffdf8, #2d2722);
+      --cc-ink: light-dark(#392d25, #f0e8dc);
+      --cc-muted: light-dark(#796e63, #c0b3a4);
+      --cc-line: light-dark(#e5dbce, #494038);
+      --cc-green: light-dark(#256747, #95d4a4);
+      --cc-red: light-dark(#ac3d3d, #f2a39a);
+      --cc-blue: light-dark(#2f638d, #a3ccef);
+      --cc-amber: light-dark(#865d22, #e7c085);
+      --cc-button: light-dark(#49372a, #e8d8c5);
+      --cc-sales-tint: light-dark(#e8f0f8, #26364a);
+      --cc-green-tint: light-dark(#e9f2eb, #293c30);
+      --cc-red-tint: light-dark(#f7eae7, #462d2b);
+      --cc-amber-tint: light-dark(#f5efdf, #453923);
+      width: 100%;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      color: var(--cc-ink);
+    }
+    #cuaderno-cuadros[data-appearance="light"] { color-scheme: light; }
+    #cuaderno-cuadros[data-appearance="dark"] { color-scheme: dark; }
+    #cuaderno-cuadros * { box-sizing: border-box; }
+    #cuaderno-cuadros .cc-stage { width: min(100%, 390px); margin: 0 auto; }
+    #cuaderno-cuadros .cc-caption { margin: 0 0 8px; color: var(--cc-muted); font-size: 12px; }
+    #cuaderno-cuadros .cc-phone {
+      overflow: hidden; border: 1px solid var(--cc-line); border-radius: 26px;
+      background: var(--cc-paper); min-width: 0;
+    }
+    #cuaderno-cuadros .cc-topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 17px 20px 12px; color: var(--cc-muted); font-size: 12px;
+    }
+    #cuaderno-cuadros .cc-brand { color: var(--cc-ink); font-weight: 700; letter-spacing: .02em; }
+    #cuaderno-cuadros .cc-content { padding: 11px 18px 18px; }
+    #cuaderno-cuadros h1 {
+      margin: 0 0 4px; font: 600 28px/1.12 Georgia, "Times New Roman", serif;
+      letter-spacing: -.025em;
+    }
+    #cuaderno-cuadros .cc-kicker { margin: 0 0 17px; color: var(--cc-muted); font-size: 12px; }
+    #cuaderno-cuadros .cc-number { margin: 7px 0 0; font-size: 28px; line-height: 1; font-weight: 720; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+    #cuaderno-cuadros .cc-label { font-size: 12px; line-height: 1.35; color: var(--cc-muted); }
+    #cuaderno-cuadros .cc-positive { color: var(--cc-green); }
+    #cuaderno-cuadros .cc-negative { color: var(--cc-red); }
+    #cuaderno-cuadros .cc-sales { color: var(--cc-blue); }
+    #cuaderno-cuadros .cc-invest { color: var(--cc-amber); }
+    #cuaderno-cuadros .cc-card { min-width: 0; border: 1px solid var(--cc-line); border-radius: 15px; background: var(--cc-card); padding: 14px; }
+    #cuaderno-cuadros .cc-model-title { margin: 0 0 10px; font-size: 12px; font-weight: 700; color: var(--cc-muted); }
+    #cuaderno-cuadros .cc-hero { padding: 17px; margin-bottom: 10px; }
+    #cuaderno-cuadros .cc-hero .cc-number { font-size: 32px; }
+    #cuaderno-cuadros .cc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    #cuaderno-cuadros .cc-grid .cc-number { font-size: 21px; white-space: nowrap; }
+    #cuaderno-cuadros[data-model="b"] h1 { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 25px; letter-spacing: -.035em; }
+    #cuaderno-cuadros[data-model="b"] .cc-tint-sales { background: var(--cc-sales-tint); }
+    #cuaderno-cuadros[data-model="b"] .cc-tint-net { background: var(--cc-green-tint); }
+    #cuaderno-cuadros[data-model="b"][data-loss="true"] .cc-tint-net { background: var(--cc-red-tint); }
+    #cuaderno-cuadros[data-model="b"] .cc-tint-expenses { background: var(--cc-red-tint); }
+    #cuaderno-cuadros[data-model="b"] .cc-tint-investment { background: var(--cc-amber-tint); }
+    #cuaderno-cuadros .cc-net-row { margin-top: 7px; padding-top: 9px; border-top: 1px solid var(--cc-line); }
+    #cuaderno-cuadros[data-model="c"] .cc-net-row { margin: 9px -5px -3px; padding: 11px 5px 4px; border-top: 1px solid var(--cc-line); background: var(--cc-green-tint); }
+    #cuaderno-cuadros[data-model="c"][data-loss="true"] .cc-net-row { background: var(--cc-red-tint); }
+    #cuaderno-cuadros .cc-details { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 2px 0; }
+    #cuaderno-cuadros .cc-detail { border-top: 1px solid var(--cc-line); padding-top: 10px; }
+    #cuaderno-cuadros .cc-stack { display: grid; gap: 9px; }
+    #cuaderno-cuadros .cc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    #cuaderno-cuadros .cc-row .cc-number { flex: none; font-size: 23px; }
+    #cuaderno-cuadros .cc-group { padding: 13px 14px; }
+    #cuaderno-cuadros .cc-actions { display: grid; gap: 9px; margin-top: 15px; }
+    #cuaderno-cuadros button { font: inherit; cursor: pointer; }
+    #cuaderno-cuadros .cc-primary, #cuaderno-cuadros .cc-secondary {
+      min-height: 44px; border-radius: 12px; padding: 10px 12px; font-size: 13px; font-weight: 650;
+    }
+    #cuaderno-cuadros .cc-primary { border: 0; background: var(--cc-button); color: var(--cc-paper); }
+    #cuaderno-cuadros .cc-secondary { border: 1px solid var(--cc-line); background: transparent; color: var(--cc-ink); }
+    #cuaderno-cuadros .cc-breakdown { margin-top: 8px; padding: 11px 13px; border: 1px solid var(--cc-line); border-radius: 12px; color: var(--cc-muted); font-size: 12px; line-height: 1.55; }
+    #cuaderno-cuadros .cc-nav { display: flex; justify-content: space-around; border-top: 1px solid var(--cc-line); padding: 13px 8px 15px; color: var(--cc-muted); font-size: 11px; }
+    #cuaderno-cuadros .cc-nav span { text-align: center; }
+    #cuaderno-cuadros .cc-nav b { display: block; margin-bottom: 3px; color: var(--cc-ink); font-size: 12px; }
+    @media (max-width: 340px) {
+      #cuaderno-cuadros .cc-content { padding-right: 13px; padding-left: 13px; }
+      #cuaderno-cuadros .cc-card { padding: 11px; }
+      #cuaderno-cuadros .cc-grid .cc-number { font-size: 18px; }
+    }
+  </style>
+  <div class="cc-stage">
+    <p class="cc-caption" id="cc-model-caption">A · Cuaderno con tarjetas · Propuesta · Datos de ejemplo</p>
+    <section class="cc-phone" id="cc-phone" data-model="a" aria-label="Resumen mensual de Modas Nicolás">
+      <header class="cc-topbar"><span class="cc-brand">Modas Nicolás</span><span>lun, 21 sep</span></header>
+      <main class="cc-content">
+        <h1>Septiembre 2026</h1>
+        <p class="cc-kicker">Resumen del mes</p>
+        <div id="cc-summary"></div>
+        <div class="cc-actions">
+          <button class="cc-primary" type="button">Registrar el día</button>
+          <button class="cc-secondary" type="button">Registrar inversión</button>
+        </div>
+      </main>
+      <nav class="cc-nav" aria-label="Navegación principal">
+        <span><b><i data-lucide="home" aria-hidden="true"></i></b>Inicio</span>
+        <span><b><i data-lucide="calendar-days" aria-hidden="true"></i></b>Calendario</span>
+        <span><b><i data-lucide="chart-no-axes-column-increasing" aria-hidden="true"></i></b>Balance</span>
+        <span><b><i data-lucide="ellipsis" aria-hidden="true"></i></b>Más</span>
+      </nav>
+    </section>
+  </div>
+  <script>
+    (() => {
+      const root = document.getElementById('cuaderno-cuadros');
+      const phone = root.querySelector('#cc-phone');
+      const summary = root.querySelector('#cc-summary');
+      const state = { model: 'a', appearance: 'auto', loss: false };
+      const modelCaption = root.querySelector('#cc-model-caption');
+      const money = value => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: 'always' }).format(value);
+      const render = () => {
+        const net = state.loss ? -260 : 2050;
+        const netLabel = state.loss ? 'Pérdida neta' : 'Beneficio neto';
+        const netClass = net < 0 ? 'cc-negative' : 'cc-positive';
+        const common = `<div class="cc-card"><span class="cc-label">Ventas</span><p class="cc-number cc-sales">${money(6840)}</p></div>
+          <div class="cc-card"><span class="cc-label">Beneficio bruto</span><p class="cc-number cc-positive">${money(2394)}</p></div>
+          <div class="cc-card"><span class="cc-label">Gastos</span><p class="cc-number cc-negative">${money(state.loss ? 2654 : 344)}</p></div>
+          <div class="cc-card"><span class="cc-label">Inversión asignada</span><p class="cc-number cc-invest">${money(4446)}</p></div>`;
+        phone.dataset.model = state.model;
+        phone.dataset.loss = String(state.loss);
+        root.dataset.model = state.model;
+        root.dataset.loss = String(state.loss);
+        root.dataset.appearance = state.appearance;
+        if (state.model === 'a') {
+          modelCaption.textContent = 'A · Cuaderno con tarjetas · Propuesta · Datos de ejemplo';
+          summary.innerHTML = `<div class="cc-card cc-hero"><span class="cc-label">${netLabel}</span><p class="cc-number ${netClass}">${net < 0 ? '−' : '+'}${money(Math.abs(net))}</p></div>
+            <div class="cc-grid">${common}</div>
+            <div class="cc-details"><div class="cc-detail"><span class="cc-label">Disponible para invertir</span><p class="cc-number cc-invest">${money(1230)}</p></div></div>`;
+        } else if (state.model === 'b') {
+          modelCaption.textContent = 'B · Panel equilibrado · Propuesta · Datos de ejemplo';
+          summary.innerHTML = `<div class="cc-grid">
+            <div class="cc-card cc-tint-sales"><span class="cc-label">Ventas</span><p class="cc-number cc-sales">${money(6840)}</p></div>
+            <div class="cc-card cc-tint-net"><span class="cc-label">${netLabel}</span><p class="cc-number ${netClass}">${net < 0 ? '−' : '+'}${money(Math.abs(net))}</p></div>
+            <div class="cc-card cc-tint-expenses"><span class="cc-label">Gastos</span><p class="cc-number cc-negative">${money(state.loss ? 2654 : 344)}</p></div>
+            <div class="cc-card cc-tint-investment"><span class="cc-label">Disponible para invertir</span><p class="cc-number cc-invest">${money(1230)}</p></div></div>
+            <div class="cc-details"><div class="cc-detail"><span class="cc-label">Beneficio bruto</span><p class="cc-number cc-positive">${money(2394)}</p></div><div class="cc-detail"><span class="cc-label">Asignado a inversión</span><p class="cc-number cc-invest">${money(4446)}</p></div></div>`;
+        } else {
+          modelCaption.textContent = 'C · Resumen por bloques · Propuesta · Datos de ejemplo';
+          summary.innerHTML = `<div class="cc-stack">
+            <div class="cc-card cc-group"><div class="cc-row"><span class="cc-label">Ventas</span><p class="cc-number cc-sales">${money(6840)}</p></div><div class="cc-row"><span class="cc-label">Beneficio bruto</span><p class="cc-number cc-positive">${money(2394)}</p></div><div class="cc-row cc-net-row"><span class="cc-label">${netLabel}</span><p class="cc-number ${netClass}">${net < 0 ? '−' : '+'}${money(Math.abs(net))}</p></div></div>
+            <div class="cc-card cc-group"><div class="cc-row"><span class="cc-label">Gastos</span><p class="cc-number cc-negative">${money(state.loss ? 2654 : 344)}</p></div></div>
+            <div class="cc-card cc-group"><div class="cc-row"><span class="cc-label">Disponible para invertir</span><p class="cc-number cc-invest">${money(1230)}</p></div><div class="cc-row"><span class="cc-label">Inversión asignada</span><p class="cc-number cc-invest">${money(4446)}</p></div></div>
+          </div>`;
+        }
+        summary.insertAdjacentHTML('beforeend', `<button class="cc-secondary" id="cc-breakdown-toggle" type="button" aria-expanded="false" style="width:100%;margin-top:10px">Ver desglose</button><div class="cc-breakdown" id="cc-breakdown" hidden>Beneficio bruto − gastos = resultado neto.<br>Disponible para invertir: ${money(1230)} · Asignado: ${money(4446)}.<br>La inversión asignada no forma parte de los gastos.</div>`);
+        const toggle = summary.querySelector('#cc-breakdown-toggle');
+        const panel = summary.querySelector('#cc-breakdown');
+        toggle.addEventListener('click', () => { panel.hidden = !panel.hidden; toggle.setAttribute('aria-expanded', String(!panel.hidden)); });
+      };
+      render();
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: root, onChange: render });
+        tweak.addSelect(state, 'model', { label: 'Modelo', options: [
+          { label: 'A · Cuaderno con tarjetas', value: 'a' },
+          { label: 'B · Panel equilibrado', value: 'b' },
+          { label: 'C · Resumen por bloques', value: 'c' }
+        ] });
+        tweak.addSelect(state, 'appearance', { label: 'Aspecto', options: [
+          { label: 'Automático', value: 'auto' }, { label: 'Claro', value: 'light' }, { label: 'Oscuro', value: 'dark' }
+        ] });
+        tweak.addToggle(state, 'loss', { label: 'Mes con pérdida' });
+      }
+    })();
+  </script>
+</div>

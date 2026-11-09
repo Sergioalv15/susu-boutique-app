@@ -1,0 +1,22 @@
+{
+  "createdAt": "2026-09-21T12:34:09.3632272+02:00",
+  "files": [
+    "src/features/daily-records/presentation/screens/CalendarScreen.tsx",
+    "src/features/daily-records/presentation/screens/HomeScreen.tsx",
+    "src/features/daily-records/presentation/components/LastDaySummaryCard.tsx",
+    "src/features/daily-records/presentation/components/UpcomingHolidaysCard.tsx",
+    "src/features/daily-records/presentation/components/BiweeklyWindow.tsx",
+    "src/features/daily-records/presentation/components/CalendarViewModeToggle.tsx",
+    "src/features/daily-records/presentation/hooks/useBiweeklyRecords.ts",
+    "src/features/daily-records/presentation/calendar/biweeklyWindowState.ts",
+    "src/features/daily-records/presentation/calendar/biweeklyFlow.test.ts",
+    "src/core/utils/date.ts",
+    "src/core/utils/date.test.ts",
+    "docs/CONTINUITY.md",
+    "src/features/daily-records/presentation/calendar/calendarA11y.ts",
+    "src/features/daily-records/presentation/calendar/calendarA11y.test.ts",
+    "work/calendar-qa/vite.config.ts",
+    "work/calendar-qa/src/calendarFixtures.ts"
+  ],
+  "note": "Pre-edit source copies for removing biweekly calendar and formatting Home full-day dates."
+}
