@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --web",
     "android": "expo run:android",
     "apk:release": "cd android && gradlew.bat assembleRelease",
     "apk:production": "node scripts/android/apk-production.mjs",

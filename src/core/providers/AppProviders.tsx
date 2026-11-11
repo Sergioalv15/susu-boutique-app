@@ -1,10 +1,15 @@
 import { Component, ErrorInfo, PropsWithChildren, ReactNode, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   getDatabaseGeneration,
   initializeDatabase,
   subscribeDatabaseGeneration,
 } from '../storage/sqlite';
+import {
+  acquireWebDatabaseTabLock,
+  isOpfsAccessHandleConflict,
+  WebDatabaseTabLockUnavailableError,
+} from '../storage/webDatabaseTabLock';
 import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
 
 type AppRootErrorBoundaryState = {
@@ -50,6 +55,7 @@ function AppBootstrapProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retrySeed, setRetrySeed] = useState(0);
+  const [reloadOnRetry, setReloadOnRetry] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -57,8 +63,16 @@ function AppBootstrapProvider({ children }: PropsWithChildren) {
     const bootstrap = async () => {
       setReady(false);
       setError(null);
+      setReloadOnRetry(false);
 
       try {
+        if (Platform.OS === 'web' && !(await acquireWebDatabaseTabLock())) {
+          if (mounted) {
+            setError('La base local ya está abierta en otra pestaña. Cerrá la otra pestaña y reintentá.');
+          }
+          return;
+        }
+
         await initializeDatabase();
         if (mounted) {
           setReady(true);
@@ -66,7 +80,16 @@ function AppBootstrapProvider({ children }: PropsWithChildren) {
       } catch (cause) {
         console.error('[AppBootstrapProvider] Failed to initialize database', cause);
         if (mounted) {
-          setError('No se pudo inicializar la base local.');
+          const accessHandleConflict =
+            Platform.OS === 'web' && isOpfsAccessHandleConflict(cause);
+          setError(
+            cause instanceof WebDatabaseTabLockUnavailableError
+              ? 'Este navegador no permite proteger el acceso exclusivo a la base local. Abrí la app en un navegador compatible.'
+              : accessHandleConflict
+                ? 'La base local ya está abierta en otra pestaña. Cerrá la otra pestaña y reintentá.'
+                : 'No se pudo inicializar la base local.',
+          );
+          setReloadOnRetry(accessHandleConflict);
         }
       }
     };
@@ -104,9 +127,16 @@ function AppBootstrapProvider({ children }: PropsWithChildren) {
               marginTop: theme.spacing.xs,
             },
           ]}
-          onPress={() => setRetrySeed((prev) => prev + 1)}
+          onPress={() => {
+            if (reloadOnRetry && Platform.OS === 'web') {
+              window.location.reload();
+              return;
+            }
+
+            setRetrySeed((prev) => prev + 1);
+          }}
         >
-          <Text style={styles.buttonText}>Reintentar</Text>
+          <Text style={styles.buttonText}>{reloadOnRetry ? 'Recargar' : 'Reintentar'}</Text>
         </Pressable>
       </View>
     );
@@ -124,7 +154,9 @@ function AppBootstrapProvider({ children }: PropsWithChildren) {
           },
         ]}
       >
-        <Text style={[styles.loading, { color: theme.colors.mutedText }]}>Inicializando datos...</Text>
+        <Text style={[styles.loading, { color: theme.colors.mutedText }]}>
+          Inicializando datos. Si otra pestaña usa la base, esta esperará a que se libere.
+        </Text>
       </View>
     );
   }
@@ -159,15 +191,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   loading: {
-    fontSize: 14,
+    fontSize: 15,
   },
   errorTitle: {
     fontWeight: '700',
-    fontSize: 18,
+    fontSize: 20,
   },
   errorDescription: {
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 15,
   },
   button: {
     backgroundColor: '#5B3A29',
