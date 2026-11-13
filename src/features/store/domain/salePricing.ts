@@ -14,7 +14,7 @@ export function normalizeSale(input: CompleteSaleInput): { items: SaleLineInput[
   const cart = 'items' in input;
   const items = cart ? input.items : [input];
   if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
-    throw new RangeError('Agregá entre 1 y 100 líneas a la venta.');
+    throw new RangeError('Agrega entre 1 y 100 líneas a la venta.');
   }
   if (cart && (typeof input.requestId !== 'string' || !/^[\w-]{8,100}$/.test(input.requestId))) {
     throw new RangeError('La referencia de venta no es válida.');
@@ -22,8 +22,8 @@ export function normalizeSale(input: CompleteSaleInput): { items: SaleLineInput[
   return {
     requestId: cart ? input.requestId : null,
     items: items.map((item) => {
-      positiveInteger(item.priceGroupId, 'Elegí un grupo de precio.');
-      positiveInteger(item.units, 'Vendé al menos una unidad.');
+      positiveInteger(item.priceGroupId, 'Elige un grupo de precio.');
+      positiveInteger(item.units, 'Vende al menos una unidad.');
       if (item.unitPriceCents !== undefined) {
         positiveInteger(item.unitPriceCents, 'El precio pactado debe ser mayor que cero y expresarse en céntimos enteros.');
         safeTotal([item.unitPriceCents * item.units]);

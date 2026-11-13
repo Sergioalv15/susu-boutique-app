@@ -38,7 +38,7 @@ class AppRootErrorBoundary extends Component<PropsWithChildren, AppRootErrorBoun
       return (
         <View style={styles.center}>
           <Text style={styles.errorTitle}>Algo salió mal.</Text>
-          <Text style={styles.errorDescription}>Cerrá y volvé a abrir la app para recuperar el estado.</Text>
+          <Text style={styles.errorDescription}>Cierra y vuelve a abrir la aplicación para recuperar el estado.</Text>
           <Pressable accessibilityRole="button" style={styles.button} onPress={this.handleRetry}>
             <Text style={styles.buttonText}>Reintentar</Text>
           </Pressable>

@@ -203,7 +203,7 @@ export class SQLiteStoreRepository implements StoreRepository {
   }
 
   async addStock(input: AddStoreStockInput): Promise<StorePriceGroup> {
-    positiveInteger(input.units, 'Ingresá una cantidad entera mayor que cero.');
+    positiveInteger(input.units, 'Introduce una cantidad entera mayor que cero.');
     positiveInteger(input.priceCents, 'El precio debe ser mayor que cero.');
     const purchaseTotal = validatePurchaseCost(input.unitCostCents, input.units);
     return withDatabaseAccess(async (db) => {
@@ -284,7 +284,7 @@ export class SQLiteStoreRepository implements StoreRepository {
   }
 
   async receiveStock(input: ReceiveStockInput): Promise<StorePriceGroup> {
-    positiveInteger(input.units, 'Ingresá una cantidad entera mayor que cero.');
+    positiveInteger(input.units, 'Introduce una cantidad entera mayor que cero.');
     const purchaseTotal = validatePurchaseCost(input.unitCostCents, input.units);
     return withDatabaseAccess(async (db) => {
       let updatedGroup: StorePriceGroup | null = null;

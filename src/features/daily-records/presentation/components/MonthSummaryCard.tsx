@@ -90,11 +90,11 @@ export function MonthSummaryCard({
           valueColor={overview.netProfit < 0 ? theme.colors.danger : overview.netProfit > 0 ? theme.colors.success : theme.colors.text}
         />
         <LedgerRow
-          label="Ventas datafono"
+          label="Ventas con tarjeta"
           value={formatCurrency(overview.totalDataphoneSales)}
           valueColor={theme.colors.sales}
           onPress={onPressDataphone}
-          accessibilityLabel={`Ventas datafono de ${monthName}, ${formatCurrency(overview.totalDataphoneSales)}`}
+          accessibilityLabel={`Ventas con tarjeta de ${monthName}, ${formatCurrency(overview.totalDataphoneSales)}`}
         />
       </View>
     </View>

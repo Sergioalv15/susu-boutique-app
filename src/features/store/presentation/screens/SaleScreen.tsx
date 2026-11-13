@@ -119,7 +119,7 @@ export function SaleScreen() {
       setStock(freshStock);
       setSummary(today);
     } catch (cause) {
-      setError(saved ? 'Venta guardada. No se pudo actualizar la vista; volvé a entrar para refrescarla.' : errorMessage(cause));
+      setError(saved ? 'Venta guardada. No se pudo actualizar la vista; vuelve a entrar para actualizarla.' : errorMessage(cause));
       // The same reference survives a retry if the write succeeded but its response was interrupted.
       const freshStock = await storeService.listStockItems().catch(() => null);
       if (freshStock) setStock(freshStock);
@@ -160,10 +160,10 @@ export function SaleScreen() {
           <Text style={colors}>Precio pactado por unidad (€)</Text>
           <TextInput accessibilityLabel="Precio pactado por unidad en euros" editable={!busy} keyboardType="decimal-pad" value={price} onChangeText={setPrice}
             placeholder="Ej. 3,00" placeholderTextColor={theme.colors.mutedText} style={[styles.priceInput, colors, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md }]} />
-          {unitPrice === null ? <StoreMessage message="Escribí un precio mayor que cero, con hasta dos decimales." error /> : null}
+          {unitPrice === null ? <StoreMessage message="Escribe un precio mayor que cero, con hasta dos decimales." error /> : null}
         </View> : null}
         <QuantityStepper value={units} onChange={setUnits} max={available} label="unidad" />
-        {units > available ? <StoreMessage message="Esta cantidad supera el stock disponible. Reducí unidades." error /> : null}
+        {units > available ? <StoreMessage message="Esta cantidad supera el stock disponible. Reduce unidades." error /> : null}
         <Text style={[styles.prompt, colors]}>Subtotal · {validLine && unitPrice ? formatEuros(units * unitPrice) : '—'}</Text>
         <PrimaryButton title={editingKey === null ? 'AGREGAR A LA VENTA' : 'GUARDAR CAMBIOS'} onPress={saveLine} disabled={!validLine || busy} />
         <Pressable accessibilityRole="button" onPress={() => setSelected(null)} style={styles.textButton}><Text style={{ color: theme.colors.primary }}>Cancelar</Text></Pressable>
@@ -171,7 +171,7 @@ export function SaleScreen() {
       {!loading && !selected ? <>
         {currentCart.length > 0 ? <View style={styles.list}>
           <Text style={[styles.prompt, colors]}>Tu venta · {totalUnits} unidades</Text>
-          {stockChanged ? <StoreMessage message="El stock cambió. Revisá las cantidades; se comprobarán otra vez al confirmar." error /> : null}
+          {stockChanged ? <StoreMessage message="El stock cambió. Revisa las cantidades; se comprobarán de nuevo al confirmar." error /> : null}
           {currentCart.map((line, index) => <StoreCard key={line.key}>
             <Text style={[styles.cardTitle, colors]}>{line.group.categoryName} · {line.units} {line.units === 1 ? 'unidad' : 'unidades'}</Text>
             <Text style={[styles.cardHint, { color: theme.colors.mutedText }]}>Base {formatEuros(line.group.priceCents)} / unidad</Text>
@@ -190,9 +190,9 @@ export function SaleScreen() {
             <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Los precios pactados solo se aplican a esta venta. El beneficio bruto real se muestra al registrarla.</Text>
           </View>
           <PrimaryButton title={`CONFIRMAR VENTA · ${formatEuros(totalCents)}`} busy={busy} disabled={!validCart || busy} onPress={() => void completeSale()} />
-        </View> : <StoreMessage message="Agregá las joyas. Podés respetar su precio base o pactar otro por unidad." />}
+        </View> : <StoreMessage message="Agrega las joyas. Puedes respetar su precio base o pactar otro por unidad." />}
         <View style={styles.list}>
-          <Text style={[styles.prompt, colors]}>{currentCart.length ? 'Agregar otra joya' : 'Elegí una categoría'}</Text>
+          <Text style={[styles.prompt, colors]}>{currentCart.length ? 'Agregar otra joya' : 'Elige una categoría'}</Text>
           {category !== null ? <Pressable disabled={busy} accessibilityRole="button" onPress={() => setCategory(null)} style={styles.textButton}><Text style={{ color: theme.colors.primary }}>‹ Todas las categorías</Text></Pressable> : null}
           {category === null ? categories.map((item) => <StoreCard key={item.id} disabled={busy} onPress={() => setCategory(item.id)} accessibilityLabel={`Elegir ${item.name}`}>
             <Text style={[styles.cardTitle, colors]}>{item.name}</Text>
@@ -203,8 +203,8 @@ export function SaleScreen() {
               <Text style={[styles.cardHint, { color: theme.colors.mutedText }]}>{remaining ? `${remaining} disponibles` : 'Sin stock disponible'}</Text>
             </StoreCard>;
           })}
-          {categories.length === 0 ? <StoreMessage message="Agregá categorías desde Tienda." /> : null}
-          {category !== null && !stock.some((item) => item.categoryId === category) ? <StoreMessage message="Esta categoría no tiene grupos. Configuralos desde Tienda." /> : null}
+          {categories.length === 0 ? <StoreMessage message="Agrega categorías desde Tienda." /> : null}
+          {category !== null && !stock.some((item) => item.categoryId === category) ? <StoreMessage message="Esta categoría no tiene grupos. Configúralos desde Tienda." /> : null}
         </View>
       </> : null}
     </Screen>

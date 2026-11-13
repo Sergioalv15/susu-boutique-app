@@ -60,7 +60,7 @@ const INSIGHTS: Insight[] = [
   },
   {
     key: 'dataphoneShare',
-    label: 'Peso del datáfono',
+    label: 'Proporción de ventas con tarjeta',
     icon: 'credit-card',
     value: (analytics) => percent(analytics.insights.dataphoneSharePercent),
     hint: (analytics) => `${money(analytics.month.dataphoneCents)} cobrado`,
@@ -447,7 +447,7 @@ export function LogisticsDashboard({
             icon="shopping-bag"
             label="Ventas del mes"
             value={money(month.salesCents)}
-            hint={month.trackedDays > 0 ? `${month.trackedDays} días registrados` : 'Registrá el día para verlo'}
+            hint={month.trackedDays > 0 ? `${month.trackedDays} días registrados` : 'Registra el día para verlo'}
             tone="sales"
           />
           <KpiTile
@@ -540,7 +540,7 @@ export function LogisticsDashboard({
 
       <View style={[styles.panelGrid, desktop ? styles.panelGridDesktop : null]}>
         <FadeIn delay={staggerDelay(6)} style={styles.panelCell}>
-          <Panel title="Capital por tipo de joya" subtitle="Dónde está parado el dinero" icon="pie-chart">
+          <Panel title="Capital por tipo de joya" subtitle="Distribución del capital" icon="pie-chart">
             {stock.topCategories.length === 0 ? (
               <Text style={[styles.note, { color: theme.colors.mutedText }]}>Todavía no hay stock registrado.</Text>
             ) : (
@@ -586,7 +586,7 @@ export function LogisticsDashboard({
                 value={percent(sales.grossMarginPercent)}
                 tone={(sales.grossMarginPercent ?? 0) < 0 ? 'danger' : 'success'}
               />
-              <Chip label="ventas con datáfono" value={money(month.dataphoneCents)} />
+              <Chip label="ventas con tarjeta" value={money(month.dataphoneCents)} />
             </View>
             {stock.unitsWithoutCost > 0 ? (
               <Text style={[styles.note, { color: theme.colors.danger }]}>

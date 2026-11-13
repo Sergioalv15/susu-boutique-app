@@ -41,7 +41,7 @@ export function LastDaySummaryCard({ loading, error, result }: Props) {
               value={formatCurrency(result.profit.netProfit)}
               valueColor={result.profit.netProfit < 0 ? theme.colors.danger : result.profit.netProfit > 0 ? theme.colors.success : theme.colors.text}
             />
-            <LedgerRow label="Ventas datafono" value={formatCurrency(record.dataphoneSales ?? 0)} valueColor={theme.colors.sales} />
+            <LedgerRow label="Ventas con tarjeta" value={formatCurrency(record.dataphoneSales ?? 0)} valueColor={theme.colors.sales} />
           </View>
         </>
       )}

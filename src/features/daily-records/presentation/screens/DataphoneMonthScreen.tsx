@@ -50,7 +50,7 @@ export function DataphoneMonthScreen() {
       <Screen>
         <View style={styles.center}>
           <ActivityIndicator color={theme.colors.primary} />
-          <Text style={[styles.muted, { color: theme.colors.mutedText }]}>Cargando datafono...</Text>
+          <Text style={[styles.muted, { color: theme.colors.mutedText }]}>Cargando ventas con tarjeta...</Text>
         </View>
       </Screen>
     );
@@ -61,7 +61,7 @@ export function DataphoneMonthScreen() {
       <Screen>
         <View style={styles.center}>
           <Text style={[styles.message, { color: theme.colors.danger }]}>
-            No se pudo cargar el detalle de datafono.
+            No se pudo cargar el detalle de las ventas con tarjeta.
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -111,7 +111,7 @@ export function DataphoneMonthScreen() {
       {dataphoneDays.length === 0 ? (
         <View style={styles.center}>
           <Text style={[styles.muted, { color: theme.colors.mutedText }]}>
-            No hubo ventas datafono este mes.
+            No hubo ventas con tarjeta este mes.
           </Text>
         </View>
       ) : (

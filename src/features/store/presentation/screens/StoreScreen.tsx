@@ -245,11 +245,11 @@ export function StoreScreen() {
 
       const asset = result.assets[0];
       if (!asset?.base64) {
-        setError('No se pudo leer la foto. Probá con otra imagen.');
+        setError('No se pudo leer la imagen. Prueba con otra imagen.');
         return;
       }
       if (asset.base64.length > 4_000_000) {
-        setError('La foto pesa demasiado. Elegí una imagen más liviana.');
+        setError('La imagen es demasiado grande. Elige una imagen más ligera.');
         return;
       }
       setSelectedPhotoDataUrl(`data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}`);
@@ -262,23 +262,23 @@ export function StoreScreen() {
     const quantity = /^\d+$/.test(units.trim()) ? Number(units.trim()) : NaN;
     const costCents = parsePurchaseCost(purchaseCost);
     if (!formCategoryId) {
-      setError('Elegí el tipo de joya.');
+      setError('Elige el tipo de joya.');
       return;
     }
     if (!selectedPriceCents) {
-      setError('Elegí un grupo de precio.');
+      setError('Elige un grupo de precio.');
       return;
     }
     if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-      setError('Ingresá una cantidad entera mayor que cero.');
+      setError('Introduce una cantidad entera mayor que cero.');
       return;
     }
     if (costCents === null) {
-      setError('Ingresá el coste de compra por unidad, con hasta dos decimales. Cero es válido.');
+      setError('Introduce el coste de compra por unidad, con hasta dos decimales. Cero es válido.');
       return;
     }
     if (!examplePhoto) {
-      setError('Elegí una foto de ejemplo para este grupo de precio.');
+      setError('Elige una imagen de ejemplo para este grupo de precio.');
       return;
     }
     if (stockLocked.current) return;

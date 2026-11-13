@@ -208,8 +208,8 @@ export function InvestmentBalanceCard({
             </Text>
 
             <TextInput
-              accessibilityLabel="Monto del ajuste en euros"
-              accessibilityHint="Monto a agregar al capital"
+              accessibilityLabel="Importe del ajuste en euros"
+              accessibilityHint="Importe que se añade al capital"
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={(value) => {

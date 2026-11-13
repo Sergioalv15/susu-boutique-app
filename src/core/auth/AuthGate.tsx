@@ -53,7 +53,7 @@ function SignInScreen() {
     const signInError = await signIn(email.trim(), password);
     setBusy(false);
     if (signInError) {
-      setError('No se pudo iniciar sesión. Revisá el correo, la contraseña y la conexión.');
+      setError('No se pudo iniciar sesión. Revisa el correo, la contraseña y la conexión.');
     }
   };
 
@@ -61,7 +61,7 @@ function SignInScreen() {
     <Screen topInset keyboardAware contentContainerStyle={styles.centerContent}>
       <View style={styles.form}>
         <Text style={[styles.brand, { color: theme.colors.text, fontFamily: theme.typography.serifFamily }]}>Susu’s Boutique</Text>
-        <Text style={[styles.heading, { color: theme.colors.text }]}>Ingresá a tu cuenta</Text>
+        <Text style={[styles.heading, { color: theme.colors.text }]}>Inicia sesión en tu cuenta</Text>
         <Text style={[styles.description, { color: theme.colors.mutedText }]}>Usá el correo y la contraseña de tu cuenta personal.</Text>
         <TextInput
           accessibilityLabel="Correo electrónico"
@@ -163,7 +163,7 @@ export function AuthGate({ children }: PropsWithChildren) {
     return (
       <AuthMessage
         title="No se pudo verificar el acceso"
-        message="Revisá tu conexión e intentá de nuevo."
+        message="Revisa tu conexión e inténtalo de nuevo."
         onRetry={() => setMembershipRetryKey((current) => current + 1)}
         onSignOut={() => void signOut()}
       />
@@ -174,7 +174,7 @@ export function AuthGate({ children }: PropsWithChildren) {
     return (
       <AuthMessage
         title="Cuenta sin acceso"
-        message="Esta cuenta todavía no está habilitada para Susu’s Boutique. Contactá a quien administra el acceso."
+        message="Esta cuenta aún no está habilitada para Susu’s Boutique. Contacta con la persona que administra el acceso."
         onSignOut={() => void signOut()}
       />
     );

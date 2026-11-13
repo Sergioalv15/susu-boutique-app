@@ -30,14 +30,14 @@ export class StoreService {
 
   getDashboardSummary(categoryId?: number): Promise<StoreDashboardSummary> {
     if (categoryId != null && (!Number.isSafeInteger(categoryId) || categoryId <= 0)) {
-      throw new RangeError('Elegí una categoría válida.');
+      throw new RangeError('Elige una categoría válida.');
     }
     return this.repository.getDashboardSummary(categoryId);
   }
 
   async createCategory(input: CreateCategoryInput): Promise<StoreCategory> {
     const name = input.name.trim();
-    if (!name) throw new Error('Escribí el nombre de la categoría.');
+    if (!name) throw new Error('Escribe el nombre de la categoría.');
     if (name.length > 40) throw new Error('El nombre no puede superar los 40 caracteres.');
     return this.repository.createCategory({ name });
   }
@@ -48,7 +48,7 @@ export class StoreService {
 
   createPriceGroup(input: CreatePriceGroupInput): Promise<StorePriceGroup> {
     if (!Number.isSafeInteger(input.categoryId) || input.categoryId <= 0) {
-      throw new RangeError('Elegí una categoría válida.');
+      throw new RangeError('Elige una categoría válida.');
     }
     if (!Number.isSafeInteger(input.priceCents) || input.priceCents <= 0) {
       throw new RangeError('El precio debe ser mayor que cero.');
@@ -58,7 +58,7 @@ export class StoreService {
 
   receiveStock(input: ReceiveStockInput): Promise<StorePriceGroup> {
     if (!Number.isSafeInteger(input.priceGroupId) || input.priceGroupId <= 0) {
-      throw new RangeError('Elegí un grupo de precio.');
+      throw new RangeError('Elige un grupo de precio.');
     }
     if (!Number.isSafeInteger(input.units) || input.units <= 0) {
       throw new RangeError('Las unidades recibidas deben ser un número entero mayor que cero.');
@@ -69,7 +69,7 @@ export class StoreService {
 
   addStock(input: AddStoreStockInput): Promise<StorePriceGroup> {
     if (!Number.isSafeInteger(input.categoryId) || input.categoryId <= 0) {
-      throw new RangeError('Elegí un tipo de joya válido.');
+      throw new RangeError('Elige un tipo de joya válido.');
     }
     if (!Number.isSafeInteger(input.priceCents) || input.priceCents <= 0) {
       throw new RangeError('El precio debe ser mayor que cero.');
@@ -78,7 +78,7 @@ export class StoreService {
       throw new RangeError('Las unidades deben ser un número entero mayor que cero.');
     }
     if (input.photoDataUrl && input.photoDataUrl.length > 4_000_000) {
-      throw new RangeError('La foto es demasiado grande. Elegí una imagen más liviana.');
+      throw new RangeError('La imagen es demasiado grande. Elige una imagen más ligera.');
     }
     validatePurchaseCost(input.unitCostCents, input.units);
     return this.repository.addStock(input);
