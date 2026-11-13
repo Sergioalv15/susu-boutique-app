@@ -25,3 +25,4 @@ expo-env.d.ts
 /docs/LOCAL_APP_BACKEND_PLAN.md
 # Local Pi runtime state
 .atl/
+.playwright-mcp
