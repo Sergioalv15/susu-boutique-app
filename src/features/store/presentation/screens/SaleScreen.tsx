@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
+import { useBusinessRole } from '../../../../core/auth/AuthGate';
 import { SaleReceipt, StoreCategory, StoreStockItem, TodaySalesSummary } from '../../domain/types';
 import { parseSalePrice } from '../../domain/salePricing';
 import { storeService } from '../../infrastructure/container';
@@ -19,6 +20,7 @@ function saleRequestId(): string {
 
 export function SaleScreen() {
   const { theme } = useTheme();
+  const isOwner = useBusinessRole() === 'owner';
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [stock, setStock] = useState<StoreStockItem[]>([]);
   const [category, setCategory] = useState<number | null>(null);
@@ -40,16 +42,20 @@ export function SaleScreen() {
   useFocusEffect(useCallback(() => {
     let active = true;
     setLoading(true);
-    void Promise.all([storeService.listCategories(), storeService.listStockItems(), storeService.getTodaySummary()])
+    void Promise.all([
+      storeService.listCategories(),
+      storeService.listStockItems(),
+      isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
+    ])
       .then(([nextCategories, nextStock, today]) => {
         if (!active) return;
         setCategories(nextCategories);
         setStock(nextStock);
-        setSummary(today);
+        if (today) setSummary(today);
       }).catch((cause) => { if (active) setError(errorMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []));
+  }, [isOwner]));
 
   const currentCart = cart.map((line) => ({ ...line, group: stock.find((item) => item.id === line.group.id) ?? line.group }));
   const totalUnits = currentCart.reduce((sum, line) => sum + line.units, 0);
@@ -110,14 +116,19 @@ export function SaleScreen() {
       requestId.current = saleRequestId();
       setLastReceipt(receipt);
       setCategory(null);
-      setSummary((previous) => {
-        const costTotalCents = previous.costTotalCents == null || receipt.costTotalCents == null ? null : previous.costTotalCents + receipt.costTotalCents;
-        const nextTotal = previous.totalCents + receipt.totalCents;
-        return { totalCents: nextTotal, unitsSold: previous.unitsSold + receipt.unitsSold, costTotalCents, profitCents: costTotalCents === null ? null : nextTotal - costTotalCents };
-      });
-      const [freshStock, today] = await Promise.all([storeService.listStockItems(), storeService.getTodaySummary()]);
+      if (isOwner) {
+        setSummary((previous) => {
+          const costTotalCents = previous.costTotalCents == null || receipt.costTotalCents == null ? null : previous.costTotalCents + receipt.costTotalCents;
+          const nextTotal = previous.totalCents + receipt.totalCents;
+          return { totalCents: nextTotal, unitsSold: previous.unitsSold + receipt.unitsSold, costTotalCents, profitCents: costTotalCents === null ? null : nextTotal - costTotalCents };
+        });
+      }
+      const [freshStock, today] = await Promise.all([
+        storeService.listStockItems(),
+        isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
+      ]);
       setStock(freshStock);
-      setSummary(today);
+      if (today) setSummary(today);
     } catch (cause) {
       setError(saved ? 'Venta guardada. No se pudo actualizar la vista; vuelve a entrar para actualizarla.' : errorMessage(cause));
       // The same reference survives a retry if the write succeeded but its response was interrupted.
@@ -134,15 +145,20 @@ export function SaleScreen() {
     <Screen contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={[styles.title, colors, { fontFamily: theme.typography.serifFamily }]}>Venta</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Hoy · {formatEuros(summary.totalCents)} · {summary.unitsSold} unidades</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Coste de lo vendido hoy · {summary.costTotalCents == null ? 'Pendiente' : formatEuros(summary.costTotalCents)}</Text>
-        <Text style={[styles.subtitle, { color: summary.profitCents != null && summary.profitCents < 0 ? theme.colors.danger : theme.colors.mutedText }]}>{grossProfitLabel(summary.profitCents)}</Text>
+        {isOwner ? <>
+          <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Hoy · {formatEuros(summary.totalCents)} · {summary.unitsSold} unidades</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Coste de lo vendido hoy · {summary.costTotalCents == null ? 'Pendiente' : formatEuros(summary.costTotalCents)}</Text>
+          <Text style={[styles.subtitle, { color: summary.profitCents != null && summary.profitCents < 0 ? theme.colors.danger : theme.colors.mutedText }]}>{grossProfitLabel(summary.profitCents)}</Text>
+        </> : null}
       </View>
       {lastReceipt ? <View accessibilityLiveRegion="polite" style={[styles.successBanner, { backgroundColor: theme.colors.card, borderRadius: theme.radius.md }]}>
         <Text style={[styles.successTitle, colors]}>Venta registrada</Text>
         <Text style={colors}>{lastReceipt.unitsSold} unidades · {formatEuros(lastReceipt.totalCents)}</Text>
-        <Text style={colors}>Coste de compra · {lastReceipt.costTotalCents == null ? 'Pendiente' : formatEuros(lastReceipt.costTotalCents)}</Text>
-        <Text style={{ color: lastReceipt.profitCents != null && lastReceipt.profitCents < 0 ? theme.colors.danger : theme.colors.text }}>{grossProfitLabel(lastReceipt.profitCents)}</Text>
+        {lastReceipt.costTotalCents !== undefined || lastReceipt.profitCents !== undefined ? <>
+          <Text style={colors}>Coste de compra · {lastReceipt.costTotalCents == null ? 'Pendiente' : formatEuros(lastReceipt.costTotalCents)}</Text>
+          <Text style={{ color: lastReceipt.profitCents != null && lastReceipt.profitCents < 0 ? theme.colors.danger : theme.colors.text }}>{grossProfitLabel(lastReceipt.profitCents)}
+          </Text>
+        </> : null}
       </View> : null}
       {error ? <StoreMessage message={error} error /> : null}
       {loading ? <ActivityIndicator color={theme.colors.primary} /> : null}
@@ -187,7 +203,8 @@ export function SaleScreen() {
           <View style={[styles.successBanner, { backgroundColor: theme.colors.card, borderRadius: theme.radius.md }]}>
             <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>A precio base · {formatEuros(baseCents)}</Text>
             <Text style={[styles.selectedPrice, colors]}>Total a cobrar · {formatEuros(totalCents)}</Text>
-            <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Los precios pactados solo se aplican a esta venta. El beneficio bruto real se muestra al registrarla.</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>Los precios pactados solo se aplican a esta venta.</Text>
+            {isOwner ? <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>El beneficio bruto real se muestra al registrarla.</Text> : null}
           </View>
           <PrimaryButton title={`CONFIRMAR VENTA · ${formatEuros(totalCents)}`} busy={busy} disabled={!validCart || busy} onPress={() => void completeSale()} />
         </View> : <StoreMessage message="Agrega las joyas. Puedes respetar su precio base o pactar otro por unidad." />}

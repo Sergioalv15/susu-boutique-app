@@ -1,6 +1,6 @@
 # Staff-only selling RPC boundary
 Feature: enforce the approved staff-only selling access rule without changing remote Supabase state.
-Risk: item 2 (authorization and financial-data exposure); item 5 (test-only PGlite dependency and lockfile change).
+Risk: item 2 (authorization and financial-data exposure); item 3 (removing an incompatible legacy migration from the active chain); item 5 (test-only PGlite dependency and lockfile change).
 
 ## Specs
 - S1: “el rol staff solo puede acceder a Vender; Tienda y Logística deben quedar bloqueadas.”
@@ -9,11 +9,12 @@ Risk: item 2 (authorization and financial-data exposure); item 5 (test-only PGli
 - S4: “No crear PR todavía.”
 
 ## Tasks
-- T1 — S1–S3 — Add isolated owner/staff RPC regression tests; observe RED for unauthorized summary and financial response leakage, including sale retry behavior — done (focused PGlite run: 2 expected failures) — inline — commit: pending with T2.
-- T2 — S1–S3 — Enforce RPC role and response boundaries; preserve owner financial access and the staff sale flow while updating affected repository/UI behavior — done (typecheck and focused PGlite tests pass) — inline — commit: pending with T1.
-- T3 — S1–S3 — Run full suite and independent security review; record a verdict for every spec — done (48 files/234 tests pass; review findings checked with source evidence and PGlite probes) — inline — commit: pending.
-- T4 — S4 — Prepare two authorized work-unit commits for the role/database foundation and the Supabase store/supplier integration; do not create a PR — in progress — inline — commit: first slice pending, final slice pending.
-- T5 — S1–S2 — Add isolated probes for staff nested stock-cost RLS and direct private helper ACL denial; confirm the existing route guard evidence — done (4 focused PGlite tests and typecheck pass; route gates confirmed in source) — inline — commit: pending with T1–T2.
+- T1 — S1–S3 — Add isolated owner/staff RPC regression tests; observe RED for unauthorized summary and financial response leakage, including sale retry behavior — done (focused PGlite run: 2 expected failures) — inline — commit: e04f87b.
+- T2 — S1–S3 — Enforce RPC role and response boundaries; preserve owner financial access and the staff sale flow while updating affected repository/UI behavior — done (typecheck and focused PGlite tests pass) — inline — commit: e04f87b (SQL) plus final app integration commit pending.
+- T3 — S1–S3 — Run full suite and independent security review; record a verdict for every spec — done (48 files/234 tests pass; review findings checked with source evidence and PGlite probes) — inline — evidence on feature branch; no separate commit.
+- T4 — S4 — Prepare two authorized work-unit commits for the role/database foundation and the Supabase store/supplier integration; do not create a PR — in progress — inline — commit: e04f87b; final slice pending.
+- T5 — S1–S2 — Add isolated probes for staff nested stock-cost RLS and direct private helper ACL denial; confirm the existing route guard evidence — done (4 focused PGlite tests and typecheck pass; route gates confirmed in source) — inline — commit: e04f87b.
+- T6 — S1–S3 — Independently verify the deleted legacy migration is incompatible with the new migration chain and preserve the old hosted project — done (verifier confirmed duplicate/incompatible schema on clean reset; no remote DB access) — inline — commit: verification only.
 
 ## Log
 - L1: Proyecto: C:/dev/pruebas/susu-boutique-app
@@ -54,3 +55,6 @@ Risk: item 2 (authorization and financial-data exposure); item 5 (test-only PGli
 - L14: Added PGlite probes for the staff nested stock-cost join and direct authenticated calls to the private receipt helper/implementation. The focused suite passed 4 tests and `npm run typecheck` passed; owner sees the test cost while staff sees a null joined cost. Route gate evidence is in `app/(drawer)/_layout.tsx:49-68`, `app/(drawer)/store.tsx:4-9`, `app/(drawer)/logistics.tsx:4-9`, `app/logistics/history.tsx:4-9`, and `src/core/auth/AuthGate.tsx:211-220`; `businessRole.test.ts:12-18` checks owner/staff predicate behavior.
 - L15: After the final test additions, `npm run typecheck` passed and `npm test` passed 48 files/234 tests. The independent reviewer inspected the migration and UI and flagged the nested cost query, missing direct-helper assertions, and route-gate evidence. Read-only exploration confirmed owner-only RLS and route guards; PGlite now verifies cost filtering and helper denial. The reviewer did not rerun tests because its disk-capacity check timed out; the parent ran the focused tests and full suite. No hosted DB writes or PR creation occurred.
 - L16: To keep commits reviewable while including the authorized feature work, split delivery into two local commits: (1) role/auth gates, ordered SQL migrations, PGlite tests and test dependency; (2) Supabase store/supplier repositories, screen/container integration, and legacy-file removals. `.pi/` and the unrelated neutral-Spanish task remain excluded. The first slice is staged; no commit or PR has been created yet.
+- L17: Created local commit `e04f87b feat(auth): enforce owner and staff access boundaries` (23 files; 2,123 insertions, 166 deletions) containing the role/auth boundary, ordered migrations, isolated PGlite tests/dependency, and task document. This is the larger authorized database/auth foundation slice; the remaining app repository integration and legacy-file changes remain uncommitted. No PR was created.
+- L18: Read the deleted legacy migration from `HEAD`: it creates `businesses` and `business_members` without the new role/business schema and defines separate `daily_records`/`investment_adjustments` tables. The new private schema migration recreates `businesses` and `business_members` with incompatible columns, so retaining both in the active chain would conflict on a clean database. This is local migration-chain evidence only; no remote database was touched. Independent review of the deletion is still required before committing that removal.
+- L19: The independent T6 verifier confirmed the old migration unconditionally creates incompatible `businesses`/`business_members` tables (`HEAD` migration lines 1–10; new schema lines 5–18), so removing it from the active new-project chain is necessary for clean resets. It confirmed repository deletion does not execute SQL, alter hosted state, or delete local SQLite data; the old project remains a backup and its migration is retained in Git history. No remote Supabase query or write was made.
