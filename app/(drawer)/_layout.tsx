@@ -2,10 +2,13 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBusinessRole } from '../../src/core/auth/AuthGate';
+import { canAccessOwnerSections } from '../../src/core/auth/businessRole';
 import { useTheme } from '../../src/core/theme/ThemeProvider';
 
 export default function AppTabsLayout() {
   const { theme } = useTheme();
+  const businessRole = useBusinessRole();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const desktop = width >= 768;
@@ -46,6 +49,7 @@ export default function AppTabsLayout() {
         name="store"
         options={{
           title: 'Tienda',
+          href: canAccessOwnerSections(businessRole) ? undefined : null,
           tabBarIcon: ({ color, size }) => <Feather name="grid" color={color} size={size} />,
         }}
       />
@@ -60,6 +64,7 @@ export default function AppTabsLayout() {
         name="logistics"
         options={{
           title: 'Logística',
+          href: canAccessOwnerSections(businessRole) ? undefined : null,
           tabBarIcon: ({ color, size }) => <Feather name="truck" color={color} size={size} />,
         }}
       />

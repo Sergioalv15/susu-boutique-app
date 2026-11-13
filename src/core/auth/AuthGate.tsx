@@ -1,13 +1,18 @@
-import { PropsWithChildren, useEffect, useState } from 'react';
+import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Screen } from '../../ui/components/Screen';
 import { PrimaryButton } from '../../ui/components/PrimaryButton';
-import { useTheme } from '../theme/ThemeProvider';
-import { SUSU_BOUTIQUE_BUSINESS_ID } from '../backend/config';
 import { getSupabaseClient } from '../backend/supabaseClient';
+import { useTheme } from '../theme/ThemeProvider';
 import { useAuth } from './AuthProvider';
+import { BusinessRole, canAccessOwnerSections, isBusinessRole } from './businessRole';
 
 type MembershipState = 'loading' | 'allowed' | 'missing' | 'error';
+const BusinessRoleContext = createContext<BusinessRole | null>(null);
+
+export function useBusinessRole(): BusinessRole | null {
+  return useContext(BusinessRoleContext);
+}
 
 function AuthMessage({
   title,
@@ -62,7 +67,7 @@ function SignInScreen() {
       <View style={styles.form}>
         <Text style={[styles.brand, { color: theme.colors.text, fontFamily: theme.typography.serifFamily }]}>Susu’s Boutique</Text>
         <Text style={[styles.heading, { color: theme.colors.text }]}>Inicia sesión en tu cuenta</Text>
-        <Text style={[styles.description, { color: theme.colors.mutedText }]}>Usá el correo y la contraseña de tu cuenta personal.</Text>
+        <Text style={[styles.description, { color: theme.colors.mutedText }]}>Usa el correo y la contraseña de una cuenta invitada.</Text>
         <TextInput
           accessibilityLabel="Correo electrónico"
           autoCapitalize="none"
@@ -107,24 +112,40 @@ function SignInScreen() {
 export function AuthGate({ children }: PropsWithChildren) {
   const { isConfigured, isLoading, error, session, retry, signOut } = useAuth();
   const [membership, setMembership] = useState<MembershipState>('loading');
+  const [businessRole, setBusinessRole] = useState<BusinessRole | null>(null);
   const [membershipRetryKey, setMembershipRetryKey] = useState(0);
 
   useEffect(() => {
     if (isLoading || !session) {
       setMembership('loading');
+      setBusinessRole(null);
       return;
     }
 
     let mounted = true;
     setMembership('loading');
+    setBusinessRole(null);
     void getSupabaseClient()
       .from('business_members')
-      .select('user_id')
-      .eq('business_id', SUSU_BOUTIQUE_BUSINESS_ID)
+      .select('business_id,role')
+      .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data, error: membershipError }) => {
         if (!mounted) return;
-        setMembership(membershipError ? 'error' : data ? 'allowed' : 'missing');
+        if (membershipError) {
+          setMembership('error');
+          return;
+        }
+        if (!data) {
+          setMembership('missing');
+          return;
+        }
+        if (!isBusinessRole(data.role)) {
+          setMembership('error');
+          return;
+        }
+        setBusinessRole(data.role);
+        setMembership('allowed');
       }, () => {
         if (mounted) setMembership('error');
       });
@@ -138,7 +159,7 @@ export function AuthGate({ children }: PropsWithChildren) {
     return (
       <AuthMessage
         title="Falta configurar la conexión"
-        message="Agregá la URL del proyecto Supabase y su clave pública en las variables de entorno para habilitar el acceso."
+        message="Agrega la URL del proyecto Supabase y su clave pública al entorno local."
       />
     );
   }
@@ -180,7 +201,23 @@ export function AuthGate({ children }: PropsWithChildren) {
     );
   }
 
-  return children;
+  return (
+    <BusinessRoleContext.Provider value={businessRole}>
+      {children}
+    </BusinessRoleContext.Provider>
+  );
+}
+
+export function OwnerOnlyRoute({ children }: PropsWithChildren) {
+  const businessRole = useBusinessRole();
+  if (canAccessOwnerSections(businessRole)) return children;
+
+  return (
+    <AuthMessage
+      title="Acceso restringido"
+      message="Tu cuenta solo tiene acceso a la sección de Vender."
+    />
+  );
 }
 
 const styles = StyleSheet.create({
