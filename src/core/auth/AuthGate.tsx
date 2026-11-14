@@ -1,10 +1,11 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
+import { createContext, PropsWithChildren, useContext, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Screen } from '../../ui/components/Screen';
 import { PrimaryButton } from '../../ui/components/PrimaryButton';
 import { getSupabaseClient } from '../backend/supabaseClient';
 import { useTheme } from '../theme/ThemeProvider';
 import { useAuth } from './AuthProvider';
+import { confirmSignOut, showSignOutFailure } from './signOutConfirmation';
 import { BusinessRole, canAccessOwnerSections, isBusinessRole } from './businessRole';
 
 type MembershipState = 'loading' | 'allowed' | 'missing' | 'error';
@@ -114,6 +115,21 @@ export function AuthGate({ children }: PropsWithChildren) {
   const [membership, setMembership] = useState<MembershipState>('loading');
   const [businessRole, setBusinessRole] = useState<BusinessRole | null>(null);
   const [membershipRetryKey, setMembershipRetryKey] = useState(0);
+  const signOutInProgress = useRef(false);
+
+  const handleSignOut = async () => {
+    if (signOutInProgress.current) return;
+    signOutInProgress.current = true;
+    try {
+      if (!await confirmSignOut()) return;
+      const signOutError = await signOut();
+      if (signOutError) showSignOutFailure();
+    } catch {
+      showSignOutFailure();
+    } finally {
+      signOutInProgress.current = false;
+    }
+  };
 
   useEffect(() => {
     if (isLoading || !session) {
@@ -186,7 +202,7 @@ export function AuthGate({ children }: PropsWithChildren) {
         title="No se pudo verificar el acceso"
         message="Revisa tu conexión e inténtalo de nuevo."
         onRetry={() => setMembershipRetryKey((current) => current + 1)}
-        onSignOut={() => void signOut()}
+        onSignOut={() => void handleSignOut()}
       />
     );
   }
@@ -196,7 +212,7 @@ export function AuthGate({ children }: PropsWithChildren) {
       <AuthMessage
         title="Cuenta sin acceso"
         message="Esta cuenta aún no está habilitada para Susu’s Boutique. Contacta con la persona que administra el acceso."
-        onSignOut={() => void signOut()}
+        onSignOut={() => void handleSignOut()}
       />
     );
   }

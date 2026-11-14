@@ -11,6 +11,7 @@ const migrations = [
   '20261111223000_store_operations.sql',
   '20261113210000_staff_can_only_sell.sql',
   '20261114120000_staff_sale_financial_boundary.sql',
+  '20261115090000_daily_investment_supabase.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;

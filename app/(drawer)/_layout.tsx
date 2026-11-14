@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBusinessRole } from '../../src/core/auth/AuthGate';
 import { canAccessOwnerSections } from '../../src/core/auth/businessRole';
 import { useTheme } from '../../src/core/theme/ThemeProvider';
+import { SignOutButton } from '../../src/core/navigation/SignOutButton';
 
 export default function AppTabsLayout() {
   const { theme } = useTheme();
@@ -15,8 +16,9 @@ export default function AppTabsLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <View style={{ paddingTop: insets.top + 16, paddingBottom: 16, paddingHorizontal: desktop ? 32 : 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-        <Text accessibilityRole="header" style={{ color: theme.colors.text, fontSize: 23, fontWeight: '700', letterSpacing: -0.5 }}>Susu's Boutique</Text>
+      <View style={{ paddingTop: insets.top + 16, paddingBottom: 16, paddingHorizontal: desktop ? 32 : 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md }}>
+        <Text accessibilityRole="header" style={{ color: theme.colors.text, fontSize: 23, fontWeight: '700', letterSpacing: -0.5, flexShrink: 1 }}>Susu's Boutique</Text>
+        <SignOutButton />
       </View>
     <Tabs
       initialRouteName="index"
