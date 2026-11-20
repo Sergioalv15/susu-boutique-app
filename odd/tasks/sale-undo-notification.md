@@ -8,8 +8,8 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 
 ## Tasks
 - T1 — S1–S2 — Persist exact FIFO lot allocations and add an idempotent, authorized audit reversal that restores those lots, preserves original sales/movements, and excludes reversed sales from net summaries — done (focused PGlite undo/history/security cases and two sale regressions pass) — inline — commit: 85fb4a4.
-- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (timer 1/1, retry PGlite 2/2, StoreService 5/5, typecheck and web build pass) — inline — commits: bcec354, 0c04246, 317205e, daa83a6.
-- T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (the final authorized suite timed out at 30 seconds; review findings were fixed, but a new bounded full-suite/review attempt requires explicit user request) — independent verifier — commit: pending.
+- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — in_progress (exact-boundary PGlite test 1/1 and typecheck pass; commit pending) — inline — commits: bcec354, 0c04246, 317205e, daa83a6; boundary fix pending.
+- T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (the final full-suite run timed out and the final review found an exact-30-second expiry boundary; a new bounded attempt requires explicit user request after correction) — independent verifier — commit: pending.
 
 ## Log
 - L1: Necesito poder hacer undo de las compras. Es decir: En venta, al realizar una venta, quiero que aparezca una notificacion para poder deshacer la ultima venta que se hizo.
@@ -45,3 +45,6 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 - L31: Added a refresh-generation guard before publishing the undo success-path refresh error, preventing a stale failure from replacing newer state. This is a small UI-state correction (Risk: item 4). Typecheck and web build pass; full-suite/review attempts remain exhausted.
 - L32: Stale refresh-error correction committed as `daa83a6` (9 changed lines). Typecheck, web build, and diff check pass. The remaining full-suite and independent-review proof is blocked and requires a new explicit user request; no hosted migration was applied.
 - L33: The final independent review's stale-error caveat was fixed in `daa83a6`. Focused PGlite and timer tests, StoreService tests (5/5), typecheck, and web build pass; the full suite timed out before summary and no review was rerun. No hosted migration was applied.
+- L34: The user explicitly authorized one new bounded full-suite run and one read-only review of `85fb4a4`, `bcec354`, `0c04246`, `317205e`, and `daa83a6`. Do not retry either attempt if it fails.
+- L35: The authorized final `npm test` run timed out at 30 seconds before producing a summary. The one full-suite attempt is consumed; no further full-suite run is authorized or planned. The authorized independent review remains to be attempted.
+- L36: A public PGlite case covers exactly 30 seconds; it showed RED with `<`, then passed after both eligibility and reversal checks changed to `<=`. No full-suite or independent-review attempt was run after this boundary correction.

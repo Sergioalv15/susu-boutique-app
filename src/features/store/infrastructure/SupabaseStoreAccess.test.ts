@@ -538,6 +538,39 @@ describe('Supabase store RPC role boundaries', () => {
     ))).resolves.toMatchObject({ rows: [{ subgroup_id: originalSubgroupId, remaining_units: 5 }] });
   });
 
+  it('rejects undo and hides retry eligibility at exactly the 30-second deadline', async () => {
+    const requestId = 'undo-exact-boundary';
+    const items = [{ priceGroupId, units: 1 }];
+    const sale = await callSaleItems(db, ownerId, requestId, items);
+    const saleId = Number(sale.saleId);
+
+    await db.exec('begin');
+    try {
+      await db.query(
+        "update public.store_sales set sold_at = now() - interval '30 seconds' where id = $1::bigint",
+        [saleId],
+      );
+      await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ownerId]);
+      await db.exec('set role authenticated');
+      const { rows } = await db.query(
+        'select public.complete_store_sale($1::jsonb, $2::text) as receipt',
+        [JSON.stringify(items), requestId],
+      );
+      expect(columnValue(rows[0], 'receipt')).toMatchObject({ saleId, undoAvailable: false });
+      await expect(db.query('select public.undo_store_sale($1::bigint)', [saleId]))
+        .rejects.toMatchObject({ code: 'P0001' });
+    } finally {
+      await db.exec('rollback');
+      await db.exec('reset role');
+    }
+
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ remaining_units: number }>(
+      'select remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    expect(rows).toEqual([{ remaining_units: 1 }]);
+  });
+
   it('does not advertise undo on an idempotent retry by another seller or after expiry', async () => {
     const requestId = 'undo-retry-window';
     const items = [{ priceGroupId, units: 1 }];

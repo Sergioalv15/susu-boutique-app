@@ -102,7 +102,7 @@ begin
       v_receipt := v_existing.request_receipt;
       if v_receipt is not null and (
         v_existing.created_by_user_id is distinct from auth.uid()
-        or v_existing.sold_at < now() - interval '30 seconds'
+        or v_existing.sold_at <= now() - interval '30 seconds'
         or exists (
           select 1 from public.store_sale_reversals as reversal
           where reversal.business_id = v_existing.business_id and reversal.sale_id = v_existing.id
@@ -424,7 +424,7 @@ begin
     );
   end if;
 
-  if v_sale.sold_at < now() - interval '30 seconds' then
+  if v_sale.sold_at <= now() - interval '30 seconds' then
     raise exception using errcode = 'P0001', message = 'El aviso para deshacer la venta ya caducó.';
   end if;
 
