@@ -21,7 +21,7 @@ export function SaleUndoNotification({ expiresAt, busy, onUndo, onHide }: Props)
     <View accessibilityLiveRegion="polite" style={[styles.notice, { backgroundColor: theme.colors.success, borderRadius: theme.radius.md }]}>
       <View style={styles.copy}>
         <Text style={[styles.title, { color: theme.colors.onPrimary }]}>¿Necesitas corregirla?</Text>
-        <Text style={[styles.message, { color: theme.colors.onPrimary }]}>Deshaz esta venta durante unos segundos.</Text>
+        <Text style={[styles.message, { color: theme.colors.onPrimary }]}>Puedes deshacer esta venta durante 30 segundos.</Text>
       </View>
       <Pressable
         accessibilityRole="button"

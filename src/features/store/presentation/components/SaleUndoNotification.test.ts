@@ -35,14 +35,14 @@ describe('SaleUndoNotification', () => {
     vi.useFakeTimers();
     const onHide = vi.fn();
     SaleUndoNotification({
-      expiresAt: Date.now() + 8_000,
+      expiresAt: Date.now() + 30_000,
       busy: true,
       onUndo: vi.fn(),
       onHide,
     });
 
     const cleanup = captured.effect!();
-    vi.advanceTimersByTime(8_000);
+    vi.advanceTimersByTime(30_000);
 
     expect(onHide).toHaveBeenCalledOnce();
     cleanup?.();

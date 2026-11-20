@@ -22,7 +22,7 @@ function saleRequestId(): string {
   return `sale-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-const SALE_UNDO_NOTICE_MS = 8_000;
+const SALE_UNDO_NOTICE_MS = 30_000;
 
 async function loadCostSubgroupsByGroup(stockItems: StoreStockItem[]): Promise<Record<number, StockCostSubgroup[]>> {
   const entries = await Promise.all(stockItems.map(async (item) => [

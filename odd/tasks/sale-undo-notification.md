@@ -5,10 +5,11 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 ## Specs
 - S1: “Necesito poder hacer undo de las compras. Es decir: En venta, al realizar una venta, quiero que aparezca una notificacion para poder deshacer la ultima venta que se hizo.”
 - S2: “Lotes FIFO exactos”
+- S3: “Aviso de 30 segundos”
 
 ## Tasks
 - T1 — S1–S2 — Persist exact FIFO lot allocations and add an idempotent, authorized audit reversal that restores those lots, preserves original sales/movements, and excludes reversed sales from net summaries — done (focused PGlite undo/history/security cases and two sale regressions pass) — inline — commit: 85fb4a4.
-- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (timer 1/1, exact-boundary PGlite 1/1, retry PGlite 2/2, StoreService 5/5, typecheck and web build pass) — inline — commits: bcec354, 0c04246, 317205e, daa83a6, ea65111.
+- T2 — S1, S3 — Add a temporary, sale-bound “Deshacer” notification action aligned to the 30-second server window; refresh stock and owner summary after reversal — in_progress (30-second notice implemented; timer test 1/1, typecheck and web build pass; commit pending) — inline — commits: bcec354, 0c04246, 317205e, daa83a6, ea65111; duration update pending.
 - T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (authorized full-suite and final review attempts are consumed; the suite timed out, the boundary fix is in `ea65111`, and another bounded attempt requires explicit user request) — independent verifier — commit: pending.
 
 ## Log
@@ -50,3 +51,6 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 - L36: A public PGlite case covers exactly 30 seconds; it showed RED with `<`, then passed after both eligibility and reversal checks changed to `<=`. No full-suite or independent-review attempt was run after this boundary correction.
 - L37: The exact-boundary correction is committed as `ea65111` (41 changed lines). The boundary PGlite test passes 1/1, with typecheck and diff check passing. This is the final implementation slice; only the blocked full-suite/review proof remains.
 - L38: The user selected “No por ahora” for another verification attempt. Keep T3 blocked; do not run another full suite or independent review until explicitly requested.
+- L39: User asked: prefiero lo que tu me recomiendes para que salga la feature
+- L40: User selected “Aviso de 30 segundos”, the recommended option to align the visible notice with the existing server-side 30-second undo window.
+- L41: Set the UI undo notice to 30 seconds and updated its copy to state that window. The focused timer test passes 1/1; typecheck and web build pass. No further full-suite/review attempt is authorized after the user's “No por ahora” choice.
