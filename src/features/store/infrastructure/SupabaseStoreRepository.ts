@@ -16,6 +16,7 @@ type CategoryRow = {
 type PriceGroupRow = {
   id: number | string;
   category_id: number | string;
+  name?: string;
   price_cents: number | string;
   stock_units: number;
   sort_order: number;
@@ -25,6 +26,7 @@ type PriceGroupRow = {
 type RpcPriceGroup = {
   id: number | string;
   categoryId: number | string;
+  name?: string;
   priceCents: number | string;
   stockUnits: number;
   sortOrder: number;
@@ -38,6 +40,8 @@ type StockGroupRow = PriceGroupRow & {
 
 type MovementRow = {
   id: number | string;
+  sale_id: number | string | null;
+  sale: { voided_at: string | null } | Array<{ voided_at: string | null }> | null;
   movement_type: StockMovement['movementType'];
   units_delta: number;
   supplier_name: string | null;
@@ -47,9 +51,11 @@ type MovementRow = {
   charged_total_cents: number | string | null;
   price_group: {
     price_cents: number | string;
+    name: string;
     category: { name: string } | Array<{ name: string }>;
   } | Array<{
     price_cents: number | string;
+    name: string;
     category: { name: string } | Array<{ name: string }>;
   }>;
   supplier: { name: string } | Array<{ name: string }> | null;
@@ -86,6 +92,7 @@ function mapPriceGroup(row: PriceGroupRow, photoDataUrl: string): StorePriceGrou
   return {
     id: Number(row.id),
     categoryId: Number(row.category_id),
+    name: row.name ?? '',
     priceCents: Number(row.price_cents),
     stockUnits: row.stock_units,
     sortOrder: row.sort_order,
@@ -197,6 +204,7 @@ async function mapRpcPriceGroup(row: RpcPriceGroup): Promise<StorePriceGroup> {
   return {
     id: Number(row.id),
     categoryId: Number(row.categoryId),
+    name: row.name ?? '',
     priceCents: Number(row.priceCents),
     stockUnits: row.stockUnits,
     sortOrder: row.sortOrder,
@@ -226,7 +234,7 @@ export class SupabaseStoreRepository implements StoreRepository {
   async listStockItems(): Promise<StoreStockItem[]> {
     const { data, error } = await getSupabaseClient()
       .from('store_price_groups')
-      .select('id,category_id,price_cents,stock_units,sort_order,photo_path,category:store_categories!inner(name),lots:store_stock_lots(remaining_units,unit_cost_cents)')
+      .select('id,category_id,name,price_cents,stock_units,sort_order,photo_path,category:store_categories!inner(name),lots:store_stock_lots(remaining_units,unit_cost_cents)')
       .eq('is_active', true)
       .eq('store_categories.is_active', true)
       .order('sort_order', { ascending: true });
@@ -272,7 +280,7 @@ export class SupabaseStoreRepository implements StoreRepository {
   async listPriceGroups(categoryId: number): Promise<StorePriceGroup[]> {
     const { data, error } = await getSupabaseClient()
       .from('store_price_groups')
-      .select('id,category_id,price_cents,stock_units,sort_order,photo_path')
+      .select('id,category_id,name,price_cents,stock_units,sort_order,photo_path')
       .eq('category_id', categoryId)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
@@ -315,8 +323,9 @@ export class SupabaseStoreRepository implements StoreRepository {
     const photoPath = input.photoDataUrl && businessId
       ? await uploadProductImage(input.photoDataUrl, businessId)
       : null;
-    const { data, error } = await getSupabaseClient().rpc('add_store_stock', {
+    const { data, error } = await getSupabaseClient().rpc('create_store_product', {
       p_category_id: input.categoryId,
+      p_name: input.name,
       p_price_cents: input.priceCents,
       p_units: input.units,
       p_unit_cost_cents: input.unitCostCents ?? null,
@@ -327,6 +336,22 @@ export class SupabaseStoreRepository implements StoreRepository {
       throw error;
     }
     return mapRpcPriceGroup(data as RpcPriceGroup);
+  }
+
+  async deleteCategory(categoryId: number): Promise<void> {
+    const { error } = await getSupabaseClient().rpc('delete_store_category', { p_category_id: categoryId });
+    if (error) throw error;
+  }
+
+  async deletePriceGroup(priceGroupId: number): Promise<void> {
+    const { data, error } = await getSupabaseClient().rpc('delete_store_product', { p_group_id: priceGroupId });
+    if (error) throw error;
+    if (data) await removeProductImage(data as string).catch(() => undefined);
+  }
+
+  async voidSale(saleId: number): Promise<void> {
+    const { error } = await getSupabaseClient().rpc('void_store_sale', { p_sale_id: saleId });
+    if (error) throw error;
   }
 
   async completeSale(input: CompleteSaleInput): Promise<SaleReceipt> {
@@ -365,7 +390,7 @@ export class SupabaseStoreRepository implements StoreRepository {
     const normalizedLimit = Math.min(100, Math.max(1, Math.floor(limit)));
     const { data, error } = await getSupabaseClient()
       .from('store_stock_movements')
-      .select('id,movement_type,units_delta,supplier_id,note,created_at,cost_total_cents,charged_total_cents,price_group:store_price_groups!inner(price_cents,category:store_categories!inner(name)),supplier:suppliers(name)')
+      .select('id,sale_id,sale:store_sales(voided_at),movement_type,units_delta,supplier_id,note,created_at,cost_total_cents,charged_total_cents,price_group:store_price_groups!inner(name,price_cents,category:store_categories!inner(name)),supplier:suppliers(name)')
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(normalizedLimit);
@@ -376,9 +401,13 @@ export class SupabaseStoreRepository implements StoreRepository {
       const group = Array.isArray(row.price_group) ? row.price_group[0] : row.price_group;
       const category = Array.isArray(group.category) ? group.category[0] : group.category;
       const supplier = Array.isArray(row.supplier) ? row.supplier[0] : row.supplier;
+      const sale = Array.isArray(row.sale) ? row.sale[0] : row.sale;
       return {
         id: Number(row.id),
+        saleId: row.sale_id == null ? null : Number(row.sale_id),
+        saleVoided: sale?.voided_at != null,
         categoryName: category?.name ?? '',
+        productName: group.name,
         priceCents: Number(group.price_cents),
         movementType: row.movement_type,
         unitsDelta: row.units_delta,

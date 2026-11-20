@@ -30,6 +30,7 @@ export function summarizeMovements(movements: StockMovement[]): MovementTotals {
 
   for (const movement of movements) {
     if (movement.movementType === 'venta') {
+      if (movement.saleVoided) continue;
       totals.salesCount += 1;
       totals.unitsSold += Math.max(0, -movement.unitsDelta);
       const charged = movement.chargedTotalCents ?? null;

@@ -61,6 +61,15 @@ describe('summarizeMovements', () => {
     expect(totals.purchaseCents).toBe(0);
     expect(totals.purchasePendingCount).toBe(0);
   });
+
+  it('excludes an annulled sale from revenue, units and profit', () => {
+    const totals = summarizeMovements([
+      movement({ id: 1, saleId: 10, saleVoided: true, chargedTotalCents: 1500, costTotalCents: 700 }),
+      movement({ id: 2, movementType: 'ajuste', saleId: 10, unitsDelta: 1, note: 'Venta anulada' }),
+      movement({ id: 3, saleId: 11, chargedTotalCents: 1500, costTotalCents: 300, unitsDelta: -1 }),
+    ]);
+    expect(totals).toMatchObject({ salesCents: 1500, salesCount: 1, unitsSold: 1, profitCents: 1200 });
+  });
 });
 
 describe('groupMovementsByDay', () => {

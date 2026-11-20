@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../../../ui/components/Screen';
 import { FadeIn } from '../../../../ui/components/FadeIn';
@@ -94,6 +94,7 @@ export function MovementHistoryScreen() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busySaleId, setBusySaleId] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -122,6 +123,31 @@ export function MovementHistoryScreen() {
   const totals = useMemo(() => summarizeMovements(visible), [visible]);
   const groups = useMemo(() => groupMovementsByDay(visible), [visible]);
   const profitTone = (totals.profitCents ?? 0) < 0 ? theme.colors.danger : theme.colors.success;
+
+  const voidSale = (saleId: number) => {
+    const action = () => void (async () => {
+      setBusySaleId(saleId);
+      setError(null);
+      let voided = false;
+      try {
+        await storeService.voidSale(saleId);
+        voided = true;
+        setMovements(await storeService.listRecentMovements(100));
+      } catch (cause) {
+        setError(voided ? 'Venta anulada. Vuelve a entrar para actualizar el historial.'
+          : cause instanceof Error ? cause.message : 'No se pudo anular la venta.');
+      } finally { setBusySaleId(null); }
+    })();
+    const message = `¿Anular la venta ${saleId}? Las unidades volverán al stock y se quitarán de los totales.`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) action();
+    } else {
+      Alert.alert('Anular venta', message, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Anular', style: 'destructive', onPress: action },
+      ]);
+    }
+  };
 
   return (
     <Screen contentContainerStyle={styles.content}>
@@ -215,11 +241,16 @@ export function MovementHistoryScreen() {
                       </Text>
                     </View>
                     {group.movements.map((movement) => (
-                      <MovementRow
-                        key={movement.id}
-                        movement={movement}
-                        timeLabel={movementTimeLabel(movement.createdAt)}
-                      />
+                      <View key={movement.id}>
+                        <MovementRow movement={movement} timeLabel={movementTimeLabel(movement.createdAt)} />
+                        {movement.movementType === 'venta' && movement.saleId && !movement.saleVoided ? (
+                          <Pressable accessibilityRole="button" disabled={busySaleId !== null}
+                            accessibilityLabel={`Anular venta ${movement.saleId}`}
+                            onPress={() => voidSale(movement.saleId!)}>
+                            <Text style={[styles.voidAction, { color: theme.colors.danger }]}>Anular venta #{movement.saleId}</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
                     ))}
                   </View>
                 ))
@@ -275,4 +306,5 @@ const styles = StyleSheet.create({
   empty: { fontSize: 13, lineHeight: 18, paddingVertical: 6 },
   note: { fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
   status: { fontSize: 15, paddingVertical: 16 },
+  voidAction: { paddingVertical: 8, textAlign: 'right', fontSize: 13, fontWeight: '600' },
 });

@@ -7,6 +7,7 @@ export interface StoreCategory {
 export interface StorePriceGroup {
   id: number;
   categoryId: number;
+  name?: string;
   priceCents: number;
   stockUnits: number;
   sortOrder: number;
@@ -23,7 +24,10 @@ export type StockMovementType = 'venta' | 'entrada' | 'ajuste';
 
 export interface StockMovement {
   id: number;
+  saleId?: number | null;
+  saleVoided?: boolean;
   categoryName: string;
+  productName?: string;
   priceCents: number;
   movementType: StockMovementType;
   unitsDelta: number;
@@ -89,6 +93,7 @@ export interface ReceiveStockInput {
 
 export interface AddStoreStockInput {
   categoryId: number;
+  name?: string;
   priceCents: number;
   units: number;
   photoDataUrl: string | null;

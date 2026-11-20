@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -25,7 +25,18 @@ function getErrorMessage(error: unknown): string {
 }
 
 function groupLabel(group: StorePriceGroup): string {
-  return `Grupo ${formatEuros(group.priceCents)}`;
+  return group.name ? `${group.name} · ${formatEuros(group.priceCents)}` : `Grupo ${formatEuros(group.priceCents)}`;
+}
+
+function confirmRemoval(message: string, action: () => void): void {
+  if (Platform.OS === 'web') {
+    if (window.confirm(message)) action();
+  } else {
+    Alert.alert('Confirmar eliminación', message, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: action },
+    ]);
+  }
 }
 
 function lowStockLabel(group: StoreStockItem): string {
@@ -122,6 +133,8 @@ export function StoreScreen() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedPriceGroupId, setSelectedPriceGroupId] = useState<number | null>(null);
   const [formCategoryId, setFormCategoryId] = useState<number | null>(null);
+  const [replenishGroupId, setReplenishGroupId] = useState<number | null>(null);
+  const [productName, setProductName] = useState('');
   const [priceChoice, setPriceChoice] = useState<PriceChoice>(null);
   const [customPrice, setCustomPrice] = useState('');
   const [units, setUnits] = useState('');
@@ -172,9 +185,7 @@ export function StoreScreen() {
   const selectedPriceCents = priceChoice === 'custom'
     ? parseSalePrice(customPrice)
     : priceChoice;
-  const existingFormGroup = stockItems.find((item) =>
-    item.categoryId === formCategoryId && item.priceCents === selectedPriceCents,
-  ) ?? null;
+  const existingFormGroup = stockItems.find((item) => item.id === replenishGroupId) ?? null;
   const previewPhoto = selectedPhotoDataUrl ?? existingFormGroup?.photoDataUrl ?? '';
   const examplePhoto = selectedPhotoDataUrl ?? existingFormGroup?.photoDataUrl ?? '';
   const lowStockItems = stockItems
@@ -203,6 +214,8 @@ export function StoreScreen() {
   const openAddStock = (categoryId?: number, group?: StorePriceGroup | null) => {
     const nextCategoryId = categoryId ?? selectedCategoryId ?? categories[0]?.id ?? null;
     setFormCategoryId(nextCategoryId);
+    setReplenishGroupId(group?.id ?? null);
+    setProductName(group?.name ?? '');
     if (group) {
       if (PRICE_PRESETS.includes(group.priceCents as (typeof PRICE_PRESETS)[number])) {
         setPriceChoice(group.priceCents as (typeof PRICE_PRESETS)[number]);
@@ -277,8 +290,12 @@ export function StoreScreen() {
       setError('Introduce el coste de compra por unidad, con hasta dos decimales. Cero es válido.');
       return;
     }
-    if (!examplePhoto) {
+    if (!examplePhoto && !existingFormGroup) {
       setError('Elige una imagen de ejemplo para este grupo de precio.');
+      return;
+    }
+    if (!existingFormGroup && (!productName.trim() || productName.trim().length > 60)) {
+      setError('Escribe un nombre de joya de hasta 60 caracteres.');
       return;
     }
     if (stockLocked.current) return;
@@ -288,13 +305,12 @@ export function StoreScreen() {
     setError(null);
     setNotice(null);
     try {
-      const group = await storeService.addStock({
-        categoryId: formCategoryId,
-        priceCents: selectedPriceCents,
-        units: quantity,
-        unitCostCents: costCents,
-        photoDataUrl: selectedPhotoDataUrl,
-      });
+      const group = existingFormGroup
+        ? await storeService.receiveStock({ priceGroupId: existingFormGroup.id, units: quantity,
+          unitCostCents: costCents, supplierId: null, note: '' })
+        : await storeService.addStock({ categoryId: formCategoryId, name: productName,
+          priceCents: selectedPriceCents, units: quantity, unitCostCents: costCents,
+          photoDataUrl: selectedPhotoDataUrl });
       const items = await refresh();
       const savedGroup = items?.find((item) => item.id === group.id);
       setSelectedCategoryId(group.categoryId);
@@ -303,6 +319,8 @@ export function StoreScreen() {
       setView(savedGroup ? 'group' : 'stock');
       setUnits('');
       setPurchaseCost('');
+      setProductName('');
+      setReplenishGroupId(null);
       setSelectedPhotoDataUrl(null);
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -317,11 +335,45 @@ export function StoreScreen() {
     setError(null);
     setNotice(`Tipo de joya "${category.name}" agregado.`);
     setFormCategoryId(category.id);
+    setReplenishGroupId(null);
+    setProductName('');
     setPriceChoice(null);
     setCustomPrice('');
     setSelectedPhotoDataUrl(null);
     void refresh();
   };
+
+  const deleteCategory = (category: StoreCategory) => confirmRemoval(
+    `¿Eliminar el tipo «${category.name}»? Solo se puede eliminar si no tiene joyas.`,
+    () => void (async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        await storeService.deleteCategory(category.id);
+        await refresh();
+        setSelectedCategoryId(null);
+        setView('stock');
+        setNotice('Tipo eliminado.');
+      } catch (cause) { setError(getErrorMessage(cause)); }
+      finally { setBusy(false); }
+    })(),
+  );
+
+  const deleteGroup = (group: StorePriceGroup) => confirmRemoval(
+    `¿Eliminar «${groupLabel(group)}»? Se borrarán su stock y entradas. Solo se permite si no tiene ventas.`,
+    () => void (async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        await storeService.deletePriceGroup(group.id);
+        await refresh();
+        setSelectedPriceGroupId(null);
+        setView('category');
+        setNotice('Joya eliminada.');
+      } catch (cause) { setError(getErrorMessage(cause)); }
+      finally { setBusy(false); }
+    })(),
+  );
 
   const goBack = () => {
     setError(null);
@@ -449,6 +501,11 @@ export function StoreScreen() {
             </View>
           )}
           <PrimaryButton title="Agregar stock" onPress={() => openAddStock(selectedCategoryId ?? undefined)} />
+          {selectedCategory && categoryGroups.length === 0 ? (
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => deleteCategory(selectedCategory)}>
+              <Text style={[styles.cancelText, { color: theme.colors.danger }]}>Eliminar tipo de joya</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -468,6 +525,9 @@ export function StoreScreen() {
             />
           ) : null}
           <PrimaryButton title="Agregar stock a este grupo" onPress={() => openAddStock(selectedPriceGroup.categoryId, selectedPriceGroup)} />
+          <Pressable accessibilityRole="button" disabled={busy} onPress={() => deleteGroup(selectedPriceGroup)}>
+            <Text style={[styles.cancelText, { color: theme.colors.danger }]}>Eliminar joya</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -479,8 +539,11 @@ export function StoreScreen() {
               {categories.map((category) => (
                 <StoreCard
                   key={category.id}
+                  disabled={!!existingFormGroup}
                   onPress={() => {
                     setFormCategoryId(category.id);
+                    setReplenishGroupId(null);
+                    setProductName('');
                     setPriceChoice(null);
                     setCustomPrice('');
                     setSelectedPhotoDataUrl(null);
@@ -493,8 +556,17 @@ export function StoreScreen() {
             </View>
             {showTypeForm ? (
               <NewTypeForm onCancel={() => setShowTypeForm(false)} onSaved={handleTypeSaved} />
-            ) : (
+            ) : !existingFormGroup ? (
               <AddTypeButton onPress={() => setShowTypeForm(true)} />
+            ) : null}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Nombre de la joya</Text>
+            {existingFormGroup ? <Text style={formInputStyle}>{existingFormGroup.name || 'Grupo existente'}</Text> : (
+              <TextInput accessibilityLabel="Nombre de la joya" value={productName} onChangeText={setProductName}
+                maxLength={60} placeholder="Ej. Collar de perlas" placeholderTextColor={theme.colors.mutedText}
+                style={formInputStyle} />
             )}
           </View>
 
@@ -504,6 +576,7 @@ export function StoreScreen() {
               {PRICE_PRESETS.map((priceCents) => (
                 <StoreCard
                   key={priceCents}
+                  disabled={!!existingFormGroup}
                   onPress={() => {
                     setPriceChoice(priceCents);
                     setCustomPrice('');
@@ -516,6 +589,7 @@ export function StoreScreen() {
                 </StoreCard>
               ))}
               <StoreCard
+                disabled={!!existingFormGroup}
                 onPress={() => {
                   setPriceChoice('custom');
                   setSelectedPhotoDataUrl(null);
@@ -529,6 +603,7 @@ export function StoreScreen() {
             {priceChoice === 'custom' ? (
               <TextInput
                 accessibilityLabel="Otro precio en euros"
+                editable={!existingFormGroup}
                 value={customPrice}
                 onChangeText={setCustomPrice}
                 keyboardType="decimal-pad"
@@ -540,7 +615,7 @@ export function StoreScreen() {
           </View>
 
           {existingFormGroup ? (
-            <StoreMessage message={`Este grupo ya existe: sus unidades se sumarán al stock actual (${existingFormGroup.stockUnits}).`} />
+            <StoreMessage message={`Repondrás esta joya. Sus unidades se sumarán al stock actual (${existingFormGroup.stockUnits}).`} />
           ) : null}
 
           <View style={styles.section}>
@@ -565,9 +640,9 @@ export function StoreScreen() {
             />
           </View>
 
-          <View style={styles.section}>
+          {!existingFormGroup ? <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Foto de ejemplo</Text>
-            <Text style={[styles.caption, { color: theme.colors.mutedText }]}>Una foto por grupo de precio; no una foto por unidad.</Text>
+            <Text style={[styles.caption, { color: theme.colors.mutedText }]}>Una foto por joya; no una foto por unidad.</Text>
             {previewPhoto ? (
               <View style={styles.photoField}>
                 <Image source={{ uri: previewPhoto }} style={styles.formPhoto} resizeMode="cover" />
@@ -588,13 +663,13 @@ export function StoreScreen() {
                 <Text style={[styles.photoLink, { color: theme.colors.primary }]}>Elegir foto de ejemplo</Text>
               </Pressable>
             )}
-          </View>
+          </View> : null}
 
           <PrimaryButton
             title="Guardar stock"
             onPress={() => void saveStock()}
             busy={busy}
-            disabled={!formCategoryId || !selectedPriceCents || !units.trim() || !previewPhoto || selectedCostCents === null}
+            disabled={!formCategoryId || !selectedPriceCents || !units.trim() || selectedCostCents === null || (!existingFormGroup && (!previewPhoto || !productName.trim()))}
           />
           <Pressable accessibilityRole="button" onPress={goBack}>
             <Text style={[styles.cancelText, { color: theme.colors.mutedText }]}>Cancelar</Text>

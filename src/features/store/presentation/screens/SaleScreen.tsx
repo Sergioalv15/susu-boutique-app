@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
@@ -139,6 +139,35 @@ export function SaleScreen() {
       setBusy(false);
     }
   };
+  const voidLastSale = (saleId: number) => {
+    const action = () => void (async () => {
+      if (busy) return;
+      setBusy(true);
+      setError(null);
+      let voided = false;
+      try {
+        await storeService.voidSale(saleId);
+        voided = true;
+        setLastReceipt(null);
+        const [freshStock, today] = await Promise.all([
+          storeService.listStockItems(), storeService.getTodaySummary(),
+        ]);
+        setStock(freshStock);
+        setSummary(today);
+      } catch (cause) {
+        setError(voided ? 'Venta anulada. Vuelve a entrar para actualizar los totales.' : errorMessage(cause));
+      } finally { setBusy(false); }
+    })();
+    const message = `¿Anular la venta ${saleId}? Las unidades volverán al stock y se quitarán de los totales.`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) action();
+    } else {
+      Alert.alert('Anular venta', message, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Anular', style: 'destructive', onPress: action },
+      ]);
+    }
+  };
   const colors = { color: theme.colors.text };
 
   return (
@@ -159,11 +188,16 @@ export function SaleScreen() {
           <Text style={{ color: lastReceipt.profitCents != null && lastReceipt.profitCents < 0 ? theme.colors.danger : theme.colors.text }}>{grossProfitLabel(lastReceipt.profitCents)}
           </Text>
         </> : null}
+        {isOwner ? <Pressable accessibilityRole="button" disabled={busy}
+          accessibilityLabel={`Anular venta ${lastReceipt.saleId}`}
+          onPress={() => voidLastSale(lastReceipt.saleId)}>
+          <Text style={{ color: theme.colors.danger, paddingVertical: 8 }}>Anular esta venta</Text>
+        </Pressable> : null}
       </View> : null}
       {error ? <StoreMessage message={error} error /> : null}
       {loading ? <ActivityIndicator color={theme.colors.primary} /> : null}
       {!loading && selectedGroup ? <View style={styles.quantityScreen}>
-        <Text style={[styles.prompt, colors]}>{selectedGroup.categoryName}</Text>
+        <Text style={[styles.prompt, colors]}>{selectedGroup.categoryName} · {selectedGroup.name || `Grupo ${formatEuros(selectedGroup.priceCents)}`}</Text>
         <Text style={[styles.selectedPrice, { color: theme.colors.primary }]}>Base · {formatEuros(selectedGroup.priceCents)} / unidad</Text>
         <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>{available} disponibles para esta línea</Text>
         <View style={styles.priceOptions} accessibilityRole="radiogroup" accessibilityLabel="Precio por unidad">
@@ -189,7 +223,7 @@ export function SaleScreen() {
           <Text style={[styles.prompt, colors]}>Tu venta · {totalUnits} unidades</Text>
           {stockChanged ? <StoreMessage message="El stock cambió. Revisa las cantidades; se comprobarán de nuevo al confirmar." error /> : null}
           {currentCart.map((line, index) => <StoreCard key={line.key}>
-            <Text style={[styles.cardTitle, colors]}>{line.group.categoryName} · {line.units} {line.units === 1 ? 'unidad' : 'unidades'}</Text>
+            <Text style={[styles.cardTitle, colors]}>{line.group.categoryName} · {line.group.name || `Grupo ${formatEuros(line.group.priceCents)}`} · {line.units} {line.units === 1 ? 'unidad' : 'unidades'}</Text>
             <Text style={[styles.cardHint, { color: theme.colors.mutedText }]}>Base {formatEuros(line.group.priceCents)} / unidad</Text>
             <Text style={colors}>{line.agreed ? 'Pactado' : 'Precio base'} · {formatEuros(line.agreed ? line.priceCents : line.group.priceCents)} / unidad</Text>
             <View style={styles.groupRow}>
@@ -215,8 +249,8 @@ export function SaleScreen() {
             <Text style={[styles.cardTitle, colors]}>{item.name}</Text>
           </StoreCard>) : stock.filter((item) => item.categoryId === category).map((group) => {
             const remaining = Math.max(0, group.stockUnits - currentCart.filter((line) => line.group.id === group.id).reduce((sum, line) => sum + line.units, 0));
-            return <StoreCard key={group.id} disabled={remaining === 0 || busy} onPress={() => openLine(group)} accessibilityLabel={`${group.categoryName}, base ${formatEuros(group.priceCents)}, ${remaining} disponibles`}>
-              <Text style={[styles.cardTitle, colors]}>{group.categoryName} · {formatEuros(group.priceCents)}</Text>
+            return <StoreCard key={group.id} disabled={remaining === 0 || busy} onPress={() => openLine(group)} accessibilityLabel={`${group.categoryName}, ${group.name || 'grupo'}, base ${formatEuros(group.priceCents)}, ${remaining} disponibles`}>
+              <Text style={[styles.cardTitle, colors]}>{group.categoryName} · {group.name || 'Grupo'} · {formatEuros(group.priceCents)}</Text>
               <Text style={[styles.cardHint, { color: theme.colors.mutedText }]}>{remaining ? `${remaining} disponibles` : 'Sin stock disponible'}</Text>
             </StoreCard>;
           })}

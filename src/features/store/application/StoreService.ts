@@ -81,7 +81,24 @@ export class StoreService {
       throw new RangeError('La imagen es demasiado grande. Elige una imagen más ligera.');
     }
     validatePurchaseCost(input.unitCostCents, input.units);
-    return this.repository.addStock(input);
+    const name = input.name?.trim() ?? '';
+    if (!name || name.length > 60) throw new Error('Escribe un nombre de joya de hasta 60 caracteres.');
+    return this.repository.addStock({ ...input, name });
+  }
+
+  deleteCategory(categoryId: number): Promise<void> {
+    if (!Number.isSafeInteger(categoryId) || categoryId <= 0) throw new RangeError('Elige un tipo de joya válido.');
+    return this.repository.deleteCategory(categoryId);
+  }
+
+  deletePriceGroup(priceGroupId: number): Promise<void> {
+    if (!Number.isSafeInteger(priceGroupId) || priceGroupId <= 0) throw new RangeError('Elige una joya válida.');
+    return this.repository.deletePriceGroup(priceGroupId);
+  }
+
+  voidSale(saleId: number): Promise<void> {
+    if (!Number.isSafeInteger(saleId) || saleId <= 0) throw new RangeError('Elige una venta válida.');
+    return this.repository.voidSale(saleId);
   }
 
   completeSale(input: CompleteSaleInput): Promise<SaleReceipt> {

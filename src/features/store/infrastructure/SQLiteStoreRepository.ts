@@ -109,6 +109,17 @@ function saleProfit(total: number, items: SaleReceiptItem[]): number | null {
   return cost === null ? null : total - cost;
 }
 export class SQLiteStoreRepository implements StoreRepository {
+  async deleteCategory(): Promise<void> {
+    throw new Error('Esta operación solo está disponible en la tienda compartida.');
+  }
+
+  async deletePriceGroup(): Promise<void> {
+    throw new Error('Esta operación solo está disponible en la tienda compartida.');
+  }
+
+  async voidSale(): Promise<void> {
+    throw new Error('Esta operación solo está disponible en la tienda compartida.');
+  }
   async getDashboardSummary(categoryId?: number) {
     const where = categoryId == null ? '' : 'WHERE groups.category_id = ?';
     const parameters = categoryId == null ? [] : [categoryId];

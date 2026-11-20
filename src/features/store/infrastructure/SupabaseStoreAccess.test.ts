@@ -12,6 +12,7 @@ const migrations = [
   '20261113210000_staff_can_only_sell.sql',
   '20261114120000_staff_sale_financial_boundary.sql',
   '20261115090000_daily_investment_supabase.sql',
+  '20261120120000_store_corrections.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -179,6 +180,43 @@ describe('Supabase store RPC role boundaries', () => {
     ))).rejects.toMatchObject({ code: '42501' });
     await expect(asUser(db, staffId, () => db.query(
       "select private.complete_store_sale_impl('[]'::jsonb, null)",
+    ))).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('keeps same-price products separate and restores stock when a sale is voided', async () => {
+    const { rows: baseRows } = await db.query(
+      'select category_id from public.store_price_groups where id = $1::bigint', [priceGroupId],
+    );
+    const categoryId = columnValue(baseRows[0], 'category_id');
+    const createProduct = (name: string, cost: number) => asUser(db, ownerId, async () => {
+      const { rows } = await db.query(
+        'select public.create_store_product($1::bigint,$2::text,$3::bigint,$4::integer,$5::bigint,$6::text) as result',
+        [categoryId, name, 1500, 2, cost, `${businessId}/${name}.jpg`],
+      );
+      return columnValue(rows[0], 'result') as JsonRecord;
+    });
+    const first = await createProduct('Collar A', 700);
+    const second = await createProduct('Collar B', 300);
+    expect(first.id).not.toBe(second.id);
+
+    const sale = await callSale(db, ownerId, 'void-test-sale', Number(first.id));
+    expect(sale).toMatchObject({ totalCents: 1500, costTotalCents: 700, profitCents: 800 });
+    await asUser(db, ownerId, () => db.query('select public.void_store_sale($1::bigint)', [sale.saleId]));
+
+    const summary = await callTodaySummary(db, ownerId);
+    expect(summary).toMatchObject({ totalCents: 0, unitsSold: 0, costTotalCents: 0, profitCents: 0 });
+    const { rows } = await db.query(
+      'select id, stock_units from public.store_price_groups where id in ($1::bigint,$2::bigint)',
+      [first.id, second.id],
+    );
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, stock_units: 2 }),
+      expect.objectContaining({ id: second.id, stock_units: 2 }),
+    ]));
+    await expect(callSale(db, ownerId, 'void-test-sale', Number(first.id)))
+      .rejects.toMatchObject({ code: 'P0001' });
+    await expect(asUser(db, staffId, () => db.query(
+      'select public.void_store_sale($1::bigint)', [sale.saleId],
     ))).rejects.toMatchObject({ code: '42501' });
   });
 });

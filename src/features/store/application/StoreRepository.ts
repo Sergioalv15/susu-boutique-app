@@ -22,6 +22,9 @@ export interface StoreRepository {
   createPriceGroup(input: CreatePriceGroupInput): Promise<StorePriceGroup>;
   receiveStock(input: ReceiveStockInput): Promise<StorePriceGroup>;
   addStock(input: AddStoreStockInput): Promise<StorePriceGroup>;
+  deleteCategory(categoryId: number): Promise<void>;
+  deletePriceGroup(priceGroupId: number): Promise<void>;
+  voidSale(saleId: number): Promise<void>;
   completeSale(input: CompleteSaleInput): Promise<SaleReceipt>;
   getTodaySummary(date: string): Promise<TodaySalesSummary>;
   listRecentMovements(limit?: number): Promise<StockMovement[]>;

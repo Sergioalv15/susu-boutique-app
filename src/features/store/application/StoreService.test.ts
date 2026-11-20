@@ -33,6 +33,9 @@ function createRepository(): StoreRepository {
       sortOrder: 0,
       photoDataUrl: input.photoDataUrl ?? '',
     })),
+    deleteCategory: vi.fn(async () => undefined),
+    deletePriceGroup: vi.fn(async () => undefined),
+    voidSale: vi.fn(async () => undefined),
     completeSale: vi.fn(async () => ({
       saleId: 1,
       unitsSold: 1,
@@ -63,5 +66,17 @@ describe('StoreService', () => {
     expect(() => service.receiveStock({ priceGroupId: 1, units: 0, supplierId: null, note: '' }))
       .toThrow('número entero mayor que cero');
     expect(() => service.completeSale({ priceGroupId: 1, units: -1 })).toThrow('al menos una unidad');
+  });
+
+  it('requires a distinct product name and validates correction targets', async () => {
+    const repository = createRepository();
+    const service = new StoreService(repository);
+    expect(() => service.addStock({ categoryId: 1, priceCents: 1500, units: 2,
+      unitCostCents: 700, photoDataUrl: 'photo' })).toThrow('nombre de joya');
+    await service.addStock({ categoryId: 1, name: ' Collar A ', priceCents: 1500,
+      units: 2, unitCostCents: 700, photoDataUrl: 'photo' });
+    expect(repository.addStock).toHaveBeenCalledWith(expect.objectContaining({ name: 'Collar A' }));
+    expect(() => service.deletePriceGroup(0)).toThrow('joya válida');
+    expect(() => service.voidSale(-1)).toThrow('venta válida');
   });
 });

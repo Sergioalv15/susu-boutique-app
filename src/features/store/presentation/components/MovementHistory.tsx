@@ -78,7 +78,12 @@ export function MovementRow({
   const { theme } = useTheme();
   const kind = KINDS[movement.movementType];
   const amount = amountCents(movement);
-  const tone = movement.movementType === 'venta'
+  const profit = movement.movementType === 'venta' && !movement.saleVoided
+    && movement.chargedTotalCents != null && movement.costTotalCents != null
+    ? movement.chargedTotalCents - movement.costTotalCents : null;
+  const tone = movement.saleVoided && movement.movementType === 'venta'
+    ? theme.colors.mutedText
+    : movement.movementType === 'venta'
     ? theme.colors.sales
     : movement.movementType === 'entrada'
       ? theme.colors.investment
@@ -91,18 +96,25 @@ export function MovementRow({
       </View>
       <View style={styles.rowMain}>
         <Text style={[styles.rowTitle, { color: theme.colors.text }]} numberOfLines={1}>
-          {movement.categoryName} · {formatEuros(movement.priceCents)}
+          {movement.categoryName} · {movement.productName || 'Grupo'} · {formatEuros(movement.priceCents)}
         </Text>
         <Text style={[styles.rowSub, { color: theme.colors.mutedText }]} numberOfLines={1}>
-          {kind.label}
+          {movement.saleVoided && movement.movementType === 'venta' ? 'Venta anulada' : kind.label}
           {movement.supplierName ? ` · ${movement.supplierName}` : ''}
           {movement.note ? ` · ${movement.note}` : ''}
           {' · '}{timeLabel}
         </Text>
+        {movement.movementType === 'venta' && !movement.saleVoided ? (
+          <Text style={[styles.rowSub, { color: profit != null && profit < 0 ? theme.colors.danger : theme.colors.mutedText }]} numberOfLines={1}>
+            {profit == null ? 'Beneficio pendiente' : `${profit < 0 ? 'Pérdida' : 'Beneficio'} bruto · ${formatEuros(Math.abs(profit))}`}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.rowSide}>
         <Text style={[styles.rowAmount, { color: amount == null ? theme.colors.mutedText : tone }]} numberOfLines={1}>
-          {amount == null ? (movement.movementType === 'ajuste' ? '—' : 'Pendiente') : formatEuros(amount)}
+          {movement.saleVoided && movement.movementType === 'venta'
+            ? 'Anulada'
+            : amount == null ? (movement.movementType === 'ajuste' ? '—' : 'Pendiente') : formatEuros(amount)}
         </Text>
         <Text style={[styles.rowUnits, { color: theme.colors.mutedText }]} numberOfLines={1}>
           {movement.unitsDelta > 0 ? '+' : ''}{movement.unitsDelta} u
