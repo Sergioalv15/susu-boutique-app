@@ -39,10 +39,47 @@ describe('activateExistingBusinessMember', () => {
       .resolves.toBe('Solo una persona propietaria puede activar cuentas.');
   });
 
-  it('returns a safe fallback if the RPC call fails unexpectedly', async () => {
+  it('rejects malformed email input without calling Supabase', async () => {
+    await expect(activateExistingBusinessMember('cualquier cosa', 'staff'))
+      .resolves.toBe('Introduce un correo electrónico válido.');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('explains invalid email or role responses', async () => {
+    rpc.mockResolvedValue({ error: { code: '22023' } });
+
+    await expect(activateExistingBusinessMember('person@example.test', 'staff'))
+      .resolves.toBe('El correo o el rol no es válido. Selecciona owner o staff.');
+  });
+
+  it('explains when Supabase cannot find the activation RPC', async () => {
+    rpc.mockResolvedValueOnce({ error: { code: 'PGRST202', message: 'internal schema details' } });
+    rpc.mockResolvedValueOnce({ error: { code: '42883', message: 'internal schema details' } });
+
+    const expected = 'Supabase no encuentra la función de activación. Confirma que la migración esté aplicada al proyecto conectado y vuelve a cargar la app.';
+    await expect(activateExistingBusinessMember('person@example.test', 'staff')).resolves.toBe(expected);
+    await expect(activateExistingBusinessMember('person@example.test', 'staff')).resolves.toBe(expected);
+  });
+
+  it('asks expired sessions to sign in again', async () => {
+    rpc.mockResolvedValue({ error: { code: 'PGRST301' } });
+
+    await expect(activateExistingBusinessMember('person@example.test', 'staff'))
+      .resolves.toBe('Tu sesión expiró. Cierra sesión y vuelve a iniciar sesión.');
+  });
+
+  it('shows a safe error code for unknown RPC errors without exposing raw details', async () => {
+    rpc.mockResolvedValue({ error: { code: 'PGRST999', message: 'private server detail' } });
+
+    const message = await activateExistingBusinessMember('person@example.test', 'staff');
+    expect(message).toBe('No se pudo activar la cuenta (código PGRST999). Comprueba la conexión y que la app use el proyecto correcto.');
+    expect(message).not.toContain('private server detail');
+  });
+
+  it('returns a safe connection message if the RPC call rejects unexpectedly', async () => {
     rpc.mockRejectedValue(new Error('network details should not reach the user'));
 
     await expect(activateExistingBusinessMember('member@example.test', 'staff'))
-      .resolves.toBe('No se pudo activar la cuenta. Revisa la conexión e inténtalo de nuevo.');
+      .resolves.toBe('No se pudo conectar con Supabase. Comprueba la conexión e inténtalo de nuevo.');
   });
 });
