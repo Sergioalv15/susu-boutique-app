@@ -8,8 +8,8 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 
 ## Tasks
 - T1 — S1–S2 — Persist exact FIFO lot allocations and add an idempotent, authorized audit reversal that restores those lots, preserves original sales/movements, and excludes reversed sales from net summaries — done (focused PGlite undo/history/security cases and two sale regressions pass) — inline — commit: 85fb4a4.
-- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — in_progress (exact-boundary PGlite test 1/1 and typecheck pass; commit pending) — inline — commits: bcec354, 0c04246, 317205e, daa83a6; boundary fix pending.
-- T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (the final full-suite run timed out and the final review found an exact-30-second expiry boundary; a new bounded attempt requires explicit user request after correction) — independent verifier — commit: pending.
+- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (timer 1/1, exact-boundary PGlite 1/1, retry PGlite 2/2, StoreService 5/5, typecheck and web build pass) — inline — commits: bcec354, 0c04246, 317205e, daa83a6, ea65111.
+- T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (authorized full-suite and final review attempts are consumed; the suite timed out, the boundary fix is in `ea65111`, and another bounded attempt requires explicit user request) — independent verifier — commit: pending.
 
 ## Log
 - L1: Necesito poder hacer undo de las compras. Es decir: En venta, al realizar una venta, quiero que aparezca una notificacion para poder deshacer la ultima venta que se hizo.
@@ -48,3 +48,4 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 - L34: The user explicitly authorized one new bounded full-suite run and one read-only review of `85fb4a4`, `bcec354`, `0c04246`, `317205e`, and `daa83a6`. Do not retry either attempt if it fails.
 - L35: The authorized final `npm test` run timed out at 30 seconds before producing a summary. The one full-suite attempt is consumed; no further full-suite run is authorized or planned. The authorized independent review remains to be attempted.
 - L36: A public PGlite case covers exactly 30 seconds; it showed RED with `<`, then passed after both eligibility and reversal checks changed to `<=`. No full-suite or independent-review attempt was run after this boundary correction.
+- L37: The exact-boundary correction is committed as `ea65111` (41 changed lines). The boundary PGlite test passes 1/1, with typecheck and diff check passing. This is the final implementation slice; only the blocked full-suite/review proof remains.
