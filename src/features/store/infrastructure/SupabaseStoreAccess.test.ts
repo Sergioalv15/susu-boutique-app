@@ -6,12 +6,16 @@ import { PGlite } from '@electric-sql/pglite';
 const ownerId = '11111111-1111-4111-8111-111111111111';
 const staffId = '22222222-2222-4222-8222-222222222222';
 const businessId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const newStaffId = '33333333-3333-4333-8333-333333333333';
+const newOwnerId = '44444444-4444-4444-8444-444444444444';
+const outsiderId = '55555555-5555-4555-8555-555555555555';
 const migrations = [
   '20261111220000_private_app_schema.sql',
   '20261111223000_store_operations.sql',
   '20261113210000_staff_can_only_sell.sql',
   '20261114120000_staff_sale_financial_boundary.sql',
   '20261115090000_daily_investment_supabase.sql',
+  '20261115100000_owner_manage_business_members.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -51,13 +55,19 @@ async function callTodaySummary(db: PGlite, userId: string): Promise<JsonRecord>
   });
 }
 
+async function activateMember(db: PGlite, actorId: string, email: string, role: string): Promise<void> {
+  await asUser(db, actorId, async () => {
+    await db.query('select public.add_business_member_by_email($1::text, $2::text)', [email, role]);
+  });
+}
+
 async function createHarness(): Promise<{ db: PGlite; priceGroupId: number }> {
   const db = new PGlite();
   await db.exec(`
     create role anon;
     create role authenticated;
     create schema auth;
-    create table auth.users (id uuid primary key);
+    create table auth.users (id uuid primary key, email text unique);
     create function auth.uid() returns uuid
     language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
@@ -81,7 +91,10 @@ async function createHarness(): Promise<{ db: PGlite; priceGroupId: number }> {
     await db.exec(sql);
   }
 
-  await db.query('insert into auth.users (id) values ($1::uuid), ($2::uuid)', [ownerId, staffId]);
+  await db.query(
+    'insert into auth.users (id, email) values ($1::uuid, $3), ($2::uuid, $4), ($5::uuid, $6), ($7::uuid, $8), ($9::uuid, $10)',
+    [ownerId, staffId, 'owner@example.test', 'staff@example.test', newStaffId, 'new-staff@example.test', newOwnerId, 'new-owner@example.test', outsiderId, 'outsider@example.test'],
+  );
   await db.query(
     'insert into public.businesses (id, slug, name) values ($1::uuid, $2, $3)',
     [businessId, 'rpc-test', 'RPC test business'],
@@ -171,6 +184,46 @@ describe('Supabase store RPC role boundaries', () => {
 
     await expect(readCosts(ownerId)).resolves.toEqual([400]);
     await expect(readCosts(staffId)).resolves.toEqual([null]);
+  });
+
+  it('lets an owner activate existing Auth accounts with either supported role', async () => {
+    await expect(activateMember(db, ownerId, ' NEW-STAFF@example.test ', 'staff')).resolves.toBeUndefined();
+    await expect(activateMember(db, ownerId, 'new-owner@example.test', 'owner')).resolves.toBeUndefined();
+
+    const { rows } = await db.query(
+      'select user_id::text, role from public.business_members where user_id in ($1::uuid, $2::uuid) order by user_id',
+      [newStaffId, newOwnerId],
+    );
+    expect(rows).toEqual([
+      { user_id: newStaffId, role: 'staff' },
+      { user_id: newOwnerId, role: 'owner' },
+    ]);
+  });
+
+  it('denies staff and nonmembers from activating accounts without changing memberships', async () => {
+    const before = await db.query('select user_id::text, role from public.business_members order by user_id');
+
+    await expect(activateMember(db, staffId, 'new-staff@example.test', 'staff'))
+      .rejects.toMatchObject({ code: '42501' });
+    await expect(activateMember(db, outsiderId, 'new-staff@example.test', 'staff'))
+      .rejects.toMatchObject({ code: '42501' });
+
+    const after = await db.query('select user_id::text, role from public.business_members order by user_id');
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it('rejects unknown Auth emails, unsupported roles, and already-member accounts without changes', async () => {
+    const before = await db.query('select user_id::text, role from public.business_members order by user_id');
+
+    await expect(activateMember(db, ownerId, 'missing@example.test', 'staff'))
+      .rejects.toMatchObject({ code: 'P0001' });
+    await expect(activateMember(db, ownerId, 'new-staff@example.test', 'admin'))
+      .rejects.toMatchObject({ code: '22023' });
+    await expect(activateMember(db, ownerId, 'staff@example.test', 'owner'))
+      .rejects.toMatchObject({ code: '23505' });
+
+    const after = await db.query('select user_id::text, role from public.business_members order by user_id');
+    expect(after.rows).toEqual(before.rows);
   });
 
   it('does not grant authenticated users direct execution of private sale helpers', async () => {
