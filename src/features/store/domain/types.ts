@@ -100,6 +100,23 @@ export interface AddStoreStockInput {
   unitCostCents?: number | null;
 }
 
+export interface RemoveStoreStockInput {
+  priceGroupId: number;
+  units: number;
+  note?: string;
+}
+
+export interface UpdateStoreProductInput {
+  priceGroupId: number;
+  name: string;
+  priceCents: number;
+}
+
+export interface UpdateStoreProductPhotoInput {
+  priceGroupId: number;
+  photoDataUrl: string;
+}
+
 export interface SaleLineInput {
   priceGroupId: number;
   units: number;

@@ -33,6 +33,31 @@ function createRepository(): StoreRepository {
       sortOrder: 0,
       photoDataUrl: input.photoDataUrl ?? '',
     })),
+    removeStock: vi.fn(async () => ({
+      id: 1,
+      categoryId: 1,
+      priceCents: 1500,
+      stockUnits: 1,
+      sortOrder: 0,
+      photoDataUrl: '',
+    })),
+    updateProduct: vi.fn(async (input) => ({
+      id: 1,
+      categoryId: 1,
+      name: input.name,
+      priceCents: input.priceCents,
+      stockUnits: 2,
+      sortOrder: 0,
+      photoDataUrl: '',
+    })),
+    updateProductPhoto: vi.fn(async () => ({
+      id: 1,
+      categoryId: 1,
+      priceCents: 1500,
+      stockUnits: 2,
+      sortOrder: 0,
+      photoDataUrl: 'photo',
+    })),
     deleteCategory: vi.fn(async () => undefined),
     deletePriceGroup: vi.fn(async () => undefined),
     voidSale: vi.fn(async () => undefined),
@@ -78,5 +103,20 @@ describe('StoreService', () => {
     expect(repository.addStock).toHaveBeenCalledWith(expect.objectContaining({ name: 'Collar A' }));
     expect(() => service.deletePriceGroup(0)).toThrow('joya válida');
     expect(() => service.voidSale(-1)).toThrow('venta válida');
+  });
+
+  it('validates Shopify-style stock corrections before reaching the repository', async () => {
+    const repository = createRepository();
+    const service = new StoreService(repository);
+
+    expect(() => service.removeStock({ priceGroupId: 1, units: 0 })).toThrow('mayor que cero');
+    expect(() => service.updateProduct({ priceGroupId: 0, name: 'Collar', priceCents: 100 })).toThrow('joya válida');
+    expect(() => service.updateProduct({ priceGroupId: 1, name: '  ', priceCents: 100 })).toThrow('nombre de joya');
+    expect(() => service.updateProductPhoto({ priceGroupId: 1, photoDataUrl: 'not-an-image' })).toThrow('formato de la imagen');
+
+    await service.removeStock({ priceGroupId: 1, units: 2, note: '  Corrección  ' });
+    expect(repository.removeStock).toHaveBeenCalledWith({ priceGroupId: 1, units: 2, note: 'Corrección' });
+    await service.updateProduct({ priceGroupId: 1, name: ' Collar A ', priceCents: 1600 });
+    expect(repository.updateProduct).toHaveBeenCalledWith({ priceGroupId: 1, name: 'Collar A', priceCents: 1600 });
   });
 });

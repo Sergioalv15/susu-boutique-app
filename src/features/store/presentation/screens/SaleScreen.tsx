@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
@@ -20,6 +20,7 @@ function saleRequestId(): string {
 
 export function SaleScreen() {
   const { theme } = useTheme();
+  const params = useLocalSearchParams<{ group?: string }>();
   const isOwner = useBusinessRole() === 'owner';
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [stock, setStock] = useState<StoreStockItem[]>([]);
@@ -36,6 +37,7 @@ export function SaleScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
+  const lastPreselectedGroup = useRef<number | null>(null);
   const requestId = useRef(saleRequestId());
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +87,15 @@ export function SaleScreen() {
     setAgreed(line?.agreed ?? false);
     setPrice(((line?.priceCents ?? group.priceCents) / 100).toFixed(2));
   };
+
+  useEffect(() => {
+    const groupId = Number(params.group);
+    if (!params.group || !Number.isSafeInteger(groupId) || lastPreselectedGroup.current === groupId) return;
+    const group = stock.find((item) => item.id === groupId);
+    if (!group) return;
+    lastPreselectedGroup.current = groupId;
+    openLine(group);
+  }, [params.group, stock]);
   const updateCart = (next: CartLine[]) => {
     if (locked.current) return;
     requestId.current = saleRequestId();

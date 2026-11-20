@@ -5,6 +5,9 @@ import {
   CreateCategoryInput,
   CreatePriceGroupInput,
   ReceiveStockInput,
+  RemoveStoreStockInput,
+  UpdateStoreProductInput,
+  UpdateStoreProductPhotoInput,
   SaleReceipt,
   StockMovement,
   StoreCategory,
@@ -16,6 +19,8 @@ import {
 import { StoreRepository } from './StoreRepository';
 import { normalizeSale } from '../domain/salePricing';
 import { validatePurchaseCost } from '../domain/stockCost';
+
+const IMAGE_DATA_URL = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 export class StoreService {
   constructor(private readonly repository: StoreRepository) {}
@@ -84,6 +89,38 @@ export class StoreService {
     const name = input.name?.trim() ?? '';
     if (!name || name.length > 60) throw new Error('Escribe un nombre de joya de hasta 60 caracteres.');
     return this.repository.addStock({ ...input, name });
+  }
+
+  removeStock(input: RemoveStoreStockInput): Promise<StorePriceGroup> {
+    if (!Number.isSafeInteger(input.priceGroupId) || input.priceGroupId <= 0) {
+      throw new RangeError('Elige una joya válida.');
+    }
+    if (!Number.isSafeInteger(input.units) || input.units <= 0) {
+      throw new RangeError('Las unidades deben ser un número entero mayor que cero.');
+    }
+    return this.repository.removeStock({ ...input, note: input.note?.trim() ?? '' });
+  }
+
+  updateProduct(input: UpdateStoreProductInput): Promise<StorePriceGroup> {
+    if (!Number.isSafeInteger(input.priceGroupId) || input.priceGroupId <= 0) {
+      throw new RangeError('Elige una joya válida.');
+    }
+    const name = input.name.trim();
+    if (!name || name.length > 60) throw new Error('Escribe un nombre de joya de hasta 60 caracteres.');
+    if (!Number.isSafeInteger(input.priceCents) || input.priceCents <= 0) {
+      throw new RangeError('El precio debe ser mayor que cero.');
+    }
+    return this.repository.updateProduct({ priceGroupId: input.priceGroupId, name, priceCents: input.priceCents });
+  }
+
+  updateProductPhoto(input: UpdateStoreProductPhotoInput): Promise<StorePriceGroup> {
+    if (!Number.isSafeInteger(input.priceGroupId) || input.priceGroupId <= 0) {
+      throw new RangeError('Elige una joya válida.');
+    }
+    if (input.photoDataUrl.length > 4_000_000 || !IMAGE_DATA_URL.test(input.photoDataUrl)) {
+      throw new Error('El formato de la imagen no es válido.');
+    }
+    return this.repository.updateProductPhoto(input);
   }
 
   deleteCategory(categoryId: number): Promise<void> {

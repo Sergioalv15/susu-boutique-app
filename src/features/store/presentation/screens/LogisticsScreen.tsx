@@ -9,10 +9,11 @@ import { addMonths, daysInMonthCount, startOfMonth } from '../../../../core/util
 import { computeDailyProfit } from '../../../daily-records/domain/calculators';
 import { DailyRecord } from '../../../daily-records/domain/types';
 import { useMonthlyOverview } from '../../../daily-records/presentation/hooks/useMonthlyOverview';
-import { StoreDashboardSummary, StoreStockItem, StockMovement } from '../../domain/types';
+import { StoreCategory, StoreDashboardSummary, StoreStockItem, StockMovement } from '../../domain/types';
 import { calculateLogisticsAnalytics, LogisticsDayInput } from '../../domain/logisticsAnalytics';
 import { storeService } from '../../infrastructure/container';
 import { LogisticsDashboard } from '../components/LogisticsDashboard';
+import { LogisticsStockPanel } from '../components/LogisticsStockPanel';
 import { RecentMovementsPanel } from '../components/MovementHistory';
 import { StoreMessage } from '../components/StoreComponents';
 
@@ -37,6 +38,7 @@ export function LogisticsScreen() {
   const router = useRouter();
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [stockItems, setStockItems] = useState<StoreStockItem[]>([]);
+  const [catalogCategories, setCatalogCategories] = useState<StoreCategory[]>([]);
   const [salesSummary, setSalesSummary] = useState<StoreDashboardSummary | null>(null);
   const [categorySalesSummary, setCategorySalesSummary] = useState<{
     categoryId: number;
@@ -85,14 +87,16 @@ export function LogisticsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [nextMovements, nextStock, nextSales] = await Promise.all([
+      const [nextMovements, nextStock, nextSales, nextCategories] = await Promise.all([
         storeService.listRecentMovements(25),
         storeService.listStockItems(),
         storeService.getDashboardSummary(),
+        storeService.listCategories(),
       ]);
       setMovements(nextMovements);
       setStockItems(nextStock);
       setSalesSummary(nextSales);
+      setCatalogCategories(nextCategories);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -111,12 +115,14 @@ export function LogisticsScreen() {
       storeService.listStockItems(),
       storeService.getDashboardSummary(),
       storeService.listRecentMovements(25),
+      storeService.listCategories(),
       selectedCategoryId == null ? Promise.resolve(null) : storeService.getDashboardSummary(selectedCategoryId),
-    ]).then(([nextStock, nextSales, nextMovements, nextCategorySales]) => {
+    ]).then(([nextStock, nextSales, nextMovements, nextCategories, nextCategorySales]) => {
       if (!mounted) return;
       setStockItems(nextStock);
       setSalesSummary(nextSales);
       setMovements(nextMovements);
+      setCatalogCategories(nextCategories);
       setCategorySalesSummary(
         selectedCategoryId == null || nextCategorySales == null
           ? null
@@ -177,6 +183,14 @@ export function LogisticsScreen() {
       ) : null}
 
       {error ? <StoreMessage message={error} error /> : null}
+
+      {!loading || stockItems.length > 0 ? (
+        <LogisticsStockPanel
+          items={visibleStock}
+          categories={catalogCategories}
+          onChanged={loadInitial}
+        />
+      ) : null}
 
       {!loading ? (
         <FadeIn>

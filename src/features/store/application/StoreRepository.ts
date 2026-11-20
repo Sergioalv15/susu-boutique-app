@@ -4,6 +4,9 @@ import {
   CreateCategoryInput,
   CreatePriceGroupInput,
   ReceiveStockInput,
+  RemoveStoreStockInput,
+  UpdateStoreProductInput,
+  UpdateStoreProductPhotoInput,
   SaleReceipt,
   StockMovement,
   StoreCategory,
@@ -22,6 +25,9 @@ export interface StoreRepository {
   createPriceGroup(input: CreatePriceGroupInput): Promise<StorePriceGroup>;
   receiveStock(input: ReceiveStockInput): Promise<StorePriceGroup>;
   addStock(input: AddStoreStockInput): Promise<StorePriceGroup>;
+  removeStock(input: RemoveStoreStockInput): Promise<StorePriceGroup>;
+  updateProduct(input: UpdateStoreProductInput): Promise<StorePriceGroup>;
+  updateProductPhoto(input: UpdateStoreProductPhotoInput): Promise<StorePriceGroup>;
   deleteCategory(categoryId: number): Promise<void>;
   deletePriceGroup(priceGroupId: number): Promise<void>;
   voidSale(saleId: number): Promise<void>;

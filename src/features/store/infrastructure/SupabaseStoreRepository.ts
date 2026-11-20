@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../../../core/backend/supabaseClient';
-import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, StoreCategory, StorePriceGroup, StoreStockItem, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
+import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, StoreCategory, StorePriceGroup, StoreStockItem, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput, RemoveStoreStockInput, UpdateStoreProductInput, UpdateStoreProductPhotoInput } from '../domain/types';
 import { StoreRepository } from '../application/StoreRepository';
 import { normalizeSale } from '../domain/salePricing';
 import { nonnegativeTotal } from '../domain/stockCost';
@@ -336,6 +336,44 @@ export class SupabaseStoreRepository implements StoreRepository {
       throw error;
     }
     return mapRpcPriceGroup(data as RpcPriceGroup);
+  }
+
+  async removeStock(input: RemoveStoreStockInput): Promise<StorePriceGroup> {
+    const { data, error } = await getSupabaseClient().rpc('remove_store_stock', {
+      p_group_id: input.priceGroupId,
+      p_units: input.units,
+      p_note: input.note ?? '',
+    });
+    if (error) throw error;
+    return mapRpcPriceGroup(data as RpcPriceGroup);
+  }
+
+  async updateProduct(input: UpdateStoreProductInput): Promise<StorePriceGroup> {
+    const { data, error } = await getSupabaseClient().rpc('update_store_product', {
+      p_group_id: input.priceGroupId,
+      p_name: input.name,
+      p_price_cents: input.priceCents,
+    });
+    if (error) throw error;
+    return mapRpcPriceGroup(data as RpcPriceGroup);
+  }
+
+  async updateProductPhoto(input: UpdateStoreProductPhotoInput): Promise<StorePriceGroup> {
+    const businessId = await getCurrentBusinessId();
+    const photoPath = await uploadProductImage(input.photoDataUrl, businessId);
+    const { data, error } = await getSupabaseClient().rpc('update_store_product_photo', {
+      p_group_id: input.priceGroupId,
+      p_photo_path: photoPath,
+    });
+    if (error) {
+      await removeProductImage(photoPath).catch(() => undefined);
+      throw error;
+    }
+    const result = data as RpcPriceGroup & { previousPhotoPath?: string };
+    if (result.previousPhotoPath) {
+      await removeProductImage(result.previousPhotoPath).catch(() => undefined);
+    }
+    return mapRpcPriceGroup(result);
   }
 
   async deleteCategory(categoryId: number): Promise<void> {

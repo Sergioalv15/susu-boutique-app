@@ -13,6 +13,7 @@ const migrations = [
   '20261114120000_staff_sale_financial_boundary.sql',
   '20261115090000_daily_investment_supabase.sql',
   '20261120120000_store_corrections.sql',
+  '20261120130000_shopify_stock_controls.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -49,6 +50,23 @@ async function callTodaySummary(db: PGlite, userId: string): Promise<JsonRecord>
       ['2000-01-01T00:00:00Z', '2100-01-01T00:00:00Z'],
     );
     return columnValue(rows[0], 'summary') as JsonRecord;
+  });
+}
+
+async function callRpc(
+  db: PGlite,
+  userId: string,
+  name: string,
+  args: unknown[],
+  types: string[],
+): Promise<JsonRecord> {
+  return asUser(db, userId, async () => {
+    const placeholders = args.map((_, index) => `$${index + 1}::${types[index]}`).join(',');
+    const { rows } = await db.query(
+      `select public.${name}(${placeholders}) as result`,
+      args,
+    );
+    return columnValue(rows[0], 'result') as JsonRecord;
   });
 }
 
@@ -218,5 +236,68 @@ describe('Supabase store RPC role boundaries', () => {
     await expect(asUser(db, staffId, () => db.query(
       'select public.void_store_sale($1::bigint)', [sale.saleId],
     ))).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('supports Shopify-style corrections without merging same-price jewels', async () => {
+    const category = await callRpc(db, ownerId, 'create_store_category', ['Catalog corrections'], ['text']);
+    const categoryId = Number(category.id);
+    const createProduct = (name: string, cost: number) => callRpc(
+      db, ownerId, 'create_store_product',
+      [categoryId, name, 1500, 3, cost, `${businessId}/${name}.jpg`],
+      ['bigint', 'text', 'bigint', 'integer', 'bigint', 'text'],
+    );
+    const collarA = await createProduct('Collar A', 700);
+    const collarB = await createProduct('Collar B', 300);
+
+    const removed = await callRpc(
+      db, ownerId, 'remove_store_stock',
+      [Number(collarA.id), 2, '  Error de carga  '],
+      ['bigint', 'integer', 'text'],
+    );
+    expect(removed).toMatchObject({ id: collarA.id, stockUnits: 1 });
+
+    const { rows: stockRows } = await db.query(
+      'select id, name, price_cents, stock_units from public.store_price_groups where id in ($1::bigint,$2::bigint) order by id',
+      [collarA.id, collarB.id],
+    );
+    expect(stockRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: collarA.id, name: 'Collar A', price_cents: 1500, stock_units: 1 }),
+      expect.objectContaining({ id: collarB.id, name: 'Collar B', price_cents: 1500, stock_units: 3 }),
+    ]));
+
+    const { rows: movementRows } = await db.query(
+      `select movement_type, units_delta, note, cost_total_cents
+       from public.store_stock_movements
+       where price_group_id = $1::bigint and movement_type = 'ajuste'`,
+      [collarA.id],
+    );
+    expect(movementRows[0]).toMatchObject({
+      movement_type: 'ajuste', units_delta: -2, note: 'Error de carga', cost_total_cents: 1400,
+    });
+
+    const corrected = await callRpc(
+      db, ownerId, 'update_store_product',
+      [Number(collarB.id), ' Collar B corregido ', 1600],
+      ['bigint', 'text', 'bigint'],
+    );
+    expect(corrected).toMatchObject({ id: collarB.id, name: 'Collar B corregido', priceCents: 1600 });
+    const { rows: unchangedRows } = await db.query(
+      'select name, price_cents from public.store_price_groups where id = $1::bigint', [collarA.id],
+    );
+    expect(unchangedRows[0]).toMatchObject({ name: 'Collar A', price_cents: 1500 });
+
+    const photo = await callRpc(
+      db, ownerId, 'update_store_product_photo',
+      [Number(collarA.id), `${businessId}/collar-a-new.jpg`],
+      ['bigint', 'text'],
+    );
+    expect(photo).toMatchObject({ id: collarA.id, photoPath: `${businessId}/collar-a-new.jpg` });
+
+    await expect(callRpc(
+      db, staffId, 'remove_store_stock', [Number(collarA.id), 1, ''], ['bigint', 'integer', 'text'],
+    )).rejects.toMatchObject({ code: '42501' });
+    await expect(callRpc(
+      db, staffId, 'update_store_product', [Number(collarB.id), 'Hack', 1], ['bigint', 'text', 'bigint'],
+    )).rejects.toMatchObject({ code: '42501' });
   });
 });

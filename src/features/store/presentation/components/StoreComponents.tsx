@@ -53,7 +53,7 @@ export function StoreCard({
   ];
 
   if (!onPress) {
-    return <View style={cardStyle}>{children}</View>;
+    return <View accessibilityLabel={accessibilityLabel} style={cardStyle}>{children}</View>;
   }
 
   return (

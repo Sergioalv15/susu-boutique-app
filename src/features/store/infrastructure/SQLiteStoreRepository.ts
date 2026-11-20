@@ -7,6 +7,9 @@ import {
   CreateCategoryInput,
   CreatePriceGroupInput,
   ReceiveStockInput,
+  RemoveStoreStockInput,
+  UpdateStoreProductInput,
+  UpdateStoreProductPhotoInput,
   SaleReceipt,
   SaleReceiptItem,
   StockMovement,
@@ -291,6 +294,63 @@ export class SQLiteStoreRepository implements StoreRepository {
 
       if (!updatedGroup) throw new Error('No se pudo agregar el stock.');
       return updatedGroup;
+    });
+  }
+
+  async removeStock(input: RemoveStoreStockInput): Promise<StorePriceGroup> {
+    positiveInteger(input.units, 'Las unidades deben ser un número entero mayor que cero.');
+    return withDatabaseAccess(async (db) => {
+      let updatedGroup: StorePriceGroup | null = null;
+      await db.withTransactionAsync(async () => {
+        const row = await db.getFirstAsync<PriceGroupRow>(
+          `SELECT id, category_id, price_cents, stock_units, sort_order, photo_data_url
+           FROM store_price_groups WHERE id = ? AND is_active = 1`,
+          [input.priceGroupId],
+        );
+        if (!row) throw new Error('El grupo de precio ya no está disponible.');
+        if (!Number.isSafeInteger(row.stock_units) || row.stock_units < input.units) {
+          throw new Error(`Solo hay ${row.stock_units} unidades disponibles.`);
+        }
+
+        const lots = await db.getAllAsync<CostLot>(
+          'SELECT id, remaining_units, unit_cost_cents FROM store_stock_lots WHERE price_group_id = ? AND remaining_units > 0 ORDER BY id ASC',
+          [input.priceGroupId],
+        );
+        const cost = consumeFifo(lots, input.units);
+        for (const lot of lots) {
+          await db.runAsync('UPDATE store_stock_lots SET remaining_units = ? WHERE id = ?', [lot.remaining_units, lot.id]);
+        }
+        await db.runAsync('UPDATE store_price_groups SET stock_units = stock_units - ? WHERE id = ?', [input.units, input.priceGroupId]);
+        await db.runAsync(
+          `INSERT INTO store_stock_movements
+             (price_group_id, movement_type, units_delta, note, created_at, cost_total_cents)
+            VALUES (?, 'ajuste', ?, ?, ?, ?)`,
+          [input.priceGroupId, -input.units, (input.note ?? '').trim(), localTimestamp(), cost],
+        );
+        updatedGroup = mapPriceGroup({ ...row, stock_units: row.stock_units - input.units });
+      });
+      if (!updatedGroup) throw new Error('No se pudo quitar el stock.');
+      return updatedGroup;
+    });
+  }
+
+  async updateProduct(): Promise<StorePriceGroup> {
+    throw new Error('Esta operación solo está disponible en la tienda compartida.');
+  }
+
+  async updateProductPhoto(input: UpdateStoreProductPhotoInput): Promise<StorePriceGroup> {
+    return withDatabaseAccess(async (db) => {
+      const row = await db.getFirstAsync<PriceGroupRow>(
+        `SELECT id, category_id, price_cents, stock_units, sort_order, photo_data_url
+         FROM store_price_groups WHERE id = ? AND is_active = 1`,
+        [input.priceGroupId],
+      );
+      if (!row) throw new Error('El grupo de precio ya no está disponible.');
+      await db.runAsync(
+        'UPDATE store_price_groups SET photo_data_url = ? WHERE id = ?',
+        [input.photoDataUrl, input.priceGroupId],
+      );
+      return mapPriceGroup({ ...row, photo_data_url: input.photoDataUrl });
     });
   }
 

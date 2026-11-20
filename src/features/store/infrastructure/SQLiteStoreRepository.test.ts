@@ -367,4 +367,29 @@ describe('SQLiteStoreRepository', () => {
     expect((await repository.listPriceGroups(1))[0].stockUnits).toBe(1);
     expect(database.prepare('SELECT COUNT(*) AS count FROM store_stock_lots').get()).toMatchObject({ count: 1 });
   });
+
+  it('removes stock with FIFO costs and records a correction movement', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 100 });
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 200 });
+
+    await repository.removeStock({ priceGroupId: 1, units: 3, note: '  Error de carga  ' });
+
+    expect((await repository.listStockItems())[0]).toMatchObject({ stockUnits: 1, inventoryCostCents: 200 });
+    expect((await repository.listRecentMovements())[0]).toMatchObject({
+      movementType: 'ajuste', unitsDelta: -3, note: 'Error de carga', costTotalCents: 400,
+    });
+    expect(database.prepare('SELECT remaining_units FROM store_stock_lots ORDER BY id').all())
+      .toEqual([{ remaining_units: 0 }, { remaining_units: 1 }]);
+  });
+
+  it('rejects removing more units than the group has', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: 100 });
+    await expect(repository.removeStock({ priceGroupId: 1, units: 2 })).rejects.toThrow('Solo hay 1 unidades disponibles.');
+    expect((await repository.listPriceGroups(1))[0].stockUnits).toBe(1);
+  });
+
+  it('updates a product photo locally', async () => {
+    await repository.updateProductPhoto({ priceGroupId: 1, photoDataUrl: 'data:image/png;base64,iVBORw0KGgo=' });
+    expect((await repository.listStockItems())[0].photoDataUrl).toBe('data:image/png;base64,iVBORw0KGgo=');
+  });
 });
