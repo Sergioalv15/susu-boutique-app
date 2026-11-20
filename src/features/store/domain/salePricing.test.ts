@@ -18,4 +18,13 @@ describe('sale pricing', () => {
     expect(() => normalizeSale({ requestId: 'short', items: [] })).toThrow();
     expect(() => normalizeSale({ requestId: 'cart-123456', items: [{ priceGroupId: 1, units: 1.5 }] })).toThrow();
   });
+
+  it('preserves selected stock subgroup ids and rejects malformed subgroup ids', () => {
+    const selectedLine = { priceGroupId: 1, units: 2, sourceSubgroupId: '17' } as never;
+    expect(normalizeSale({ requestId: 'cart-subgroup-1', items: [selectedLine] }).items)
+      .toEqual([{ priceGroupId: 1, units: 2, sourceSubgroupId: '17' }]);
+
+    const invalidLine = { priceGroupId: 1, units: 1, sourceSubgroupId: '0' } as never;
+    expect(() => normalizeSale({ requestId: 'cart-subgroup-2', items: [invalidLine] })).toThrow();
+  });
 });

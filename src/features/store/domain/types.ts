@@ -106,6 +106,8 @@ export interface AddStoreStockInput {
 export interface SaleLineInput {
   priceGroupId: number;
   units: number;
+  /** Omit to preserve legacy FIFO consumption across the whole price group. */
+  sourceSubgroupId?: string;
   /** Omit to charge the catalog price. A supplied price is agreed per unit. */
   unitPriceCents?: number;
 }

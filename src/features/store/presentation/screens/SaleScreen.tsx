@@ -5,12 +5,14 @@ import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
 import { useBusinessRole } from '../../../../core/auth/AuthGate';
-import { SaleReceipt, StoreCategory, StoreStockItem, TodaySalesSummary } from '../../domain/types';
+import { SaleReceipt, StockCostSubgroup, StoreCategory, StoreStockItem, TodaySalesSummary } from '../../domain/types';
+import { describeStockCostSubgroup } from '../../domain/stockCostSubgroups';
 import { parseSalePrice } from '../../domain/salePricing';
+import { remainingSubgroupUnits } from '../../domain/saleSubgroups';
 import { storeService } from '../../infrastructure/container';
-import { formatEuros, grossProfitLabel, QuantityStepper, StoreCard, StoreMessage } from '../components/StoreComponents';
+import { formatEuros, grossProfitLabel, QuantityStepper, StockCostSubgroupList, StoreCard, StoreMessage } from '../components/StoreComponents';
 
-type CartLine = { key: number; group: StoreStockItem; units: number; agreed: boolean; priceCents: number };
+type CartLine = { key: number; group: StoreStockItem; subgroup: StockCostSubgroup; subgroupLabel: string; units: number; agreed: boolean; priceCents: number };
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'No se pudo completar la operación.';
 }
@@ -18,13 +20,29 @@ function saleRequestId(): string {
   return `sale-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+async function loadCostSubgroupsByGroup(stockItems: StoreStockItem[]): Promise<Record<number, StockCostSubgroup[]>> {
+  const entries = await Promise.all(stockItems.map(async (item) => [
+    item.id,
+    await storeService.listStockCostSubgroups(item.id),
+  ] as const));
+  return Object.fromEntries(entries) as Record<number, StockCostSubgroup[]>;
+}
+
+function saleSubgroupLabel(subgroup: StockCostSubgroup, index: number, isOwner: boolean): string {
+  const display = describeStockCostSubgroup(subgroup, index, isOwner);
+  if (display.unitCostCents === undefined || display.unitCostCents === null) return display.label;
+  return `${display.label} · ${formatEuros(display.unitCostCents)} / unidad`;
+}
+
 export function SaleScreen() {
   const { theme } = useTheme();
   const isOwner = useBusinessRole() === 'owner';
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [stock, setStock] = useState<StoreStockItem[]>([]);
+  const [subgroupsByGroup, setSubgroupsByGroup] = useState<Record<number, StockCostSubgroup[]>>({});
   const [category, setCategory] = useState<number | null>(null);
   const [selected, setSelected] = useState<StoreStockItem | null>(null);
+  const [selectedSubgroupId, setSelectedSubgroupId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [editingKey, setEditingKey] = useState<number | null>(null);
   const nextKey = useRef(1);
@@ -47,10 +65,12 @@ export function SaleScreen() {
       storeService.listStockItems(),
       isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
     ])
-      .then(([nextCategories, nextStock, today]) => {
+      .then(async ([nextCategories, nextStock, today]) => {
+        const nextSubgroupsByGroup = await loadCostSubgroupsByGroup(nextStock);
         if (!active) return;
         setCategories(nextCategories);
         setStock(nextStock);
+        setSubgroupsByGroup(nextSubgroupsByGroup);
         if (today) setSummary(today);
       }).catch((cause) => { if (active) setError(errorMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
@@ -62,24 +82,34 @@ export function SaleScreen() {
   const totalCents = currentCart.reduce((sum, line) => sum + line.units * (line.agreed ? line.priceCents : line.group.priceCents), 0);
   const baseCents = currentCart.reduce((sum, line) => sum + line.units * line.group.priceCents, 0);
   const selectedGroup = stock.find((item) => item.id === selected?.id) ?? selected;
-  const reserved = selectedGroup ? currentCart.filter((line) => line.group.id === selectedGroup.id && line.key !== editingKey)
-    .reduce((sum, line) => sum + line.units, 0) : 0;
-  const available = Math.max(0, (stock.find((item) => item.id === selected?.id)?.stockUnits ?? 0) - reserved);
+  const selectedSubgroup = selectedGroup && selectedSubgroupId
+    ? (subgroupsByGroup[selectedGroup.id] ?? []).find((subgroup) => subgroup.subgroupId === selectedSubgroupId)
+    : undefined;
+  const subgroupReservations = currentCart.map((line) => ({ key: line.key, sourceSubgroupId: line.subgroup.subgroupId, units: line.units }));
+  const available = remainingSubgroupUnits(selectedSubgroup, subgroupReservations, editingKey);
   const stockChanged = currentCart.some((line) => {
     const group = stock.find((item) => item.id === line.group.id);
-    const requested = currentCart.filter((item) => item.group.id === line.group.id).reduce((sum, item) => sum + item.units, 0);
-    return !group || requested > group.stockUnits;
+    const requestedGroup = currentCart.filter((item) => item.group.id === line.group.id).reduce((sum, item) => sum + item.units, 0);
+    const subgroup = (subgroupsByGroup[line.group.id] ?? []).find((item) => item.subgroupId === line.subgroup.subgroupId);
+    const requestedSubgroup = currentCart.filter((item) => item.group.id === line.group.id && item.subgroup.subgroupId === line.subgroup.subgroupId)
+      .reduce((sum, item) => sum + item.units, 0);
+    return !group || requestedGroup > group.stockUnits || !subgroup || requestedSubgroup > subgroup.remainingUnits;
   });
   const unitPrice = agreed ? parseSalePrice(price) : selectedGroup?.priceCents ?? null;
-  const validLine = units > 0 && units <= available && unitPrice !== null && Number.isSafeInteger(units * unitPrice)
+  const validLine = selectedSubgroup !== undefined && units > 0 && units <= available && unitPrice !== null && Number.isSafeInteger(units * unitPrice)
     && Number.isSafeInteger(units * (selectedGroup?.priceCents ?? 0));
   const validCart = currentCart.length > 0 && Number.isSafeInteger(totalCents) && totalCents > 0
     && Number.isSafeInteger(baseCents) && Number.isSafeInteger(totalUnits);
 
   const openLine = (group: StoreStockItem, line?: CartLine) => {
     if (locked.current) return;
+    const subgroups = subgroupsByGroup[group.id] ?? [];
+    const subgroup = line
+      ? subgroups.find((candidate) => candidate.subgroupId === line.subgroup.subgroupId) ?? null
+      : subgroups.length === 1 ? subgroups[0] : null;
     setError(null);
     setSelected(group);
+    setSelectedSubgroupId(subgroup?.subgroupId ?? null);
     setEditingKey(line?.key ?? null);
     setUnits(line?.units ?? 1);
     setAgreed(line?.agreed ?? false);
@@ -92,11 +122,28 @@ export function SaleScreen() {
     setCart(next);
   };
   const saveLine = () => {
-    if (!selectedGroup || !validLine || unitPrice === null || locked.current) return;
-    const line: CartLine = { key: editingKey ?? nextKey.current++, group: selectedGroup, units, agreed, priceCents: unitPrice };
+    if (!selectedGroup || !selectedSubgroup || !validLine || unitPrice === null || locked.current) return;
+    const subgroupIndex = (subgroupsByGroup[selectedGroup.id] ?? []).findIndex((item) => item.subgroupId === selectedSubgroup.subgroupId);
+    const line: CartLine = {
+      key: editingKey ?? nextKey.current++,
+      group: selectedGroup,
+      subgroup: selectedSubgroup,
+      subgroupLabel: saleSubgroupLabel(selectedSubgroup, Math.max(0, subgroupIndex), isOwner),
+      units,
+      agreed,
+      priceCents: unitPrice,
+    };
     updateCart(editingKey === null ? [...currentCart, line] : currentCart.map((item) => item.key === editingKey ? line : item));
     setSelected(null);
+    setSelectedSubgroupId(null);
+    setEditingKey(null);
     setCategory(null);
+  };
+
+  const cancelLine = () => {
+    setSelected(null);
+    setSelectedSubgroupId(null);
+    setEditingKey(null);
   };
   const completeSale = async () => {
     if (locked.current || !validCart || selected) return;
@@ -107,8 +154,12 @@ export function SaleScreen() {
     try {
       const receipt = await storeService.completeSale({
         requestId: requestId.current,
-        items: currentCart.map((line) => ({ priceGroupId: line.group.id, units: line.units,
-          ...(line.agreed ? { unitPriceCents: line.priceCents } : {}) })),
+        items: currentCart.map((line) => ({
+          priceGroupId: line.group.id,
+          units: line.units,
+          sourceSubgroupId: line.subgroup.subgroupId,
+          ...(line.agreed ? { unitPriceCents: line.priceCents } : {}),
+        })),
       });
       saved = true;
       // Clear the charged cart before any refresh: a failed refresh must never offer to charge it again.
@@ -127,13 +178,19 @@ export function SaleScreen() {
         storeService.listStockItems(),
         isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
       ]);
+      const freshSubgroups = await loadCostSubgroupsByGroup(freshStock);
       setStock(freshStock);
+      setSubgroupsByGroup(freshSubgroups);
       if (today) setSummary(today);
     } catch (cause) {
       setError(saved ? 'Venta guardada. No se pudo actualizar la vista; vuelve a entrar para actualizarla.' : errorMessage(cause));
       // The same reference survives a retry if the write succeeded but its response was interrupted.
       const freshStock = await storeService.listStockItems().catch(() => null);
-      if (freshStock) setStock(freshStock);
+      if (freshStock) {
+        setStock(freshStock);
+        const freshSubgroups = await loadCostSubgroupsByGroup(freshStock).catch(() => null);
+        if (freshSubgroups) setSubgroupsByGroup(freshSubgroups);
+      }
     } finally {
       locked.current = false;
       setBusy(false);
@@ -165,7 +222,15 @@ export function SaleScreen() {
       {!loading && selectedGroup ? <View style={styles.quantityScreen}>
         <Text style={[styles.prompt, colors]}>{selectedGroup.categoryName}</Text>
         <Text style={[styles.selectedPrice, { color: theme.colors.primary }]}>Base · {formatEuros(selectedGroup.priceCents)} / unidad</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>{available} disponibles para esta línea</Text>
+        <StockCostSubgroupList
+          title="Elige el subgrupo de compra"
+          subgroups={subgroupsByGroup[selectedGroup.id] ?? []}
+          isOwner={isOwner}
+          selectedSubgroupId={selectedSubgroupId}
+          onSelect={(subgroup) => setSelectedSubgroupId(subgroup.subgroupId)}
+          disabled={busy}
+        />
+        {selectedSubgroup ? <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>{available} disponibles en este subgrupo</Text> : null}
         <View style={styles.priceOptions} accessibilityRole="radiogroup" accessibilityLabel="Precio por unidad">
           {[false, true].map((option) => <Pressable key={String(option)} accessibilityRole="radio" aria-checked={agreed === option} accessibilityState={{ checked: agreed === option, disabled: busy }} disabled={busy}
             onPress={() => setAgreed(option)} style={[styles.priceOption, { borderColor: agreed === option ? theme.colors.primary : theme.colors.border, backgroundColor: agreed === option ? theme.colors.card : theme.colors.surface, borderRadius: theme.radius.md }]}>
@@ -179,10 +244,10 @@ export function SaleScreen() {
           {unitPrice === null ? <StoreMessage message="Escribe un precio mayor que cero, con hasta dos decimales." error /> : null}
         </View> : null}
         <QuantityStepper value={units} onChange={setUnits} max={available} label="unidad" />
-        {units > available ? <StoreMessage message="Esta cantidad supera el stock disponible. Reduce unidades." error /> : null}
+        {selectedSubgroup && units > available ? <StoreMessage message="Esta cantidad supera el stock disponible en este subgrupo. Reduce unidades." error /> : null}
         <Text style={[styles.prompt, colors]}>Subtotal · {validLine && unitPrice ? formatEuros(units * unitPrice) : '—'}</Text>
         <PrimaryButton title={editingKey === null ? 'AGREGAR A LA VENTA' : 'GUARDAR CAMBIOS'} onPress={saveLine} disabled={!validLine || busy} />
-        <Pressable accessibilityRole="button" onPress={() => setSelected(null)} style={styles.textButton}><Text style={{ color: theme.colors.primary }}>Cancelar</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={cancelLine} style={styles.textButton}><Text style={{ color: theme.colors.primary }}>Cancelar</Text></Pressable>
       </View> : null}
       {!loading && !selected ? <>
         {currentCart.length > 0 ? <View style={styles.list}>
@@ -190,6 +255,7 @@ export function SaleScreen() {
           {stockChanged ? <StoreMessage message="El stock cambió. Revisa las cantidades; se comprobarán de nuevo al confirmar." error /> : null}
           {currentCart.map((line, index) => <StoreCard key={line.key}>
             <Text style={[styles.cardTitle, colors]}>{line.group.categoryName} · {line.units} {line.units === 1 ? 'unidad' : 'unidades'}</Text>
+            <Text style={[styles.cardHint, { color: theme.colors.mutedText }]}>{line.subgroupLabel}</Text>
             <Text style={[styles.cardHint, { color: theme.colors.mutedText }]}>Base {formatEuros(line.group.priceCents)} / unidad</Text>
             <Text style={colors}>{line.agreed ? 'Pactado' : 'Precio base'} · {formatEuros(line.agreed ? line.priceCents : line.group.priceCents)} / unidad</Text>
             <View style={styles.groupRow}>

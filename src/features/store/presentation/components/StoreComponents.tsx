@@ -83,6 +83,7 @@ export function StockCostSubgroupList({
   error = null,
   selectedSubgroupId,
   onSelect,
+  disabled = false,
 }: {
   subgroups: StockCostSubgroup[];
   isOwner: boolean;
@@ -91,6 +92,7 @@ export function StockCostSubgroupList({
   error?: string | null;
   selectedSubgroupId?: string | null;
   onSelect?: (subgroup: StockCostSubgroup) => void;
+  disabled?: boolean;
 }) {
   const { theme } = useTheme();
   return (
@@ -113,6 +115,7 @@ export function StockCostSubgroupList({
           <StoreCard
             key={subgroup.subgroupId}
             onPress={onSelect ? () => onSelect(subgroup) : undefined}
+            disabled={disabled || loading || Boolean(error)}
             selected={selectedSubgroupId === subgroup.subgroupId}
             accessibilityLabel={accessibleDescription}
           >

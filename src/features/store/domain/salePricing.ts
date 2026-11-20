@@ -24,11 +24,19 @@ export function normalizeSale(input: CompleteSaleInput): { items: SaleLineInput[
     items: items.map((item) => {
       positiveInteger(item.priceGroupId, 'Elige un grupo de precio.');
       positiveInteger(item.units, 'Vende al menos una unidad.');
+      if (item.sourceSubgroupId !== undefined && !/^[1-9]\d*$/.test(item.sourceSubgroupId)) {
+        throw new RangeError('El subgrupo de compra no es válido.');
+      }
       if (item.unitPriceCents !== undefined) {
         positiveInteger(item.unitPriceCents, 'El precio pactado debe ser mayor que cero y expresarse en céntimos enteros.');
         safeTotal([item.unitPriceCents * item.units]);
       }
-      return { priceGroupId: item.priceGroupId, units: item.units, ...(item.unitPriceCents === undefined ? {} : { unitPriceCents: item.unitPriceCents }) };
+      return {
+        priceGroupId: item.priceGroupId,
+        units: item.units,
+        ...(item.sourceSubgroupId === undefined ? {} : { sourceSubgroupId: item.sourceSubgroupId }),
+        ...(item.unitPriceCents === undefined ? {} : { unitPriceCents: item.unitPriceCents }),
+      };
     }),
   };
 }
