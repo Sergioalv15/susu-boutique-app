@@ -58,13 +58,19 @@ export function SaleScreen() {
   const [undoNotice, setUndoNotice] = useState<{ saleId: number; expiresAt: number } | null>(null);
   const [undoConfirmation, setUndoConfirmation] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [saleBusy, setSaleBusy] = useState(false);
+  const [saleWriteBusy, setSaleWriteBusy] = useState(false);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const busy = saleBusy || undoBusy;
   const locked = useRef(false);
+  const undoLocked = useRef(false);
+  const refreshGeneration = useRef(0);
   const requestId = useRef(saleRequestId());
   const [error, setError] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    const generation = ++refreshGeneration.current;
     setLoading(true);
     void Promise.all([
       storeService.listCategories(),
@@ -73,7 +79,7 @@ export function SaleScreen() {
     ])
       .then(async ([nextCategories, nextStock, today]) => {
         const nextSubgroupsByGroup = await loadCostSubgroupsByGroup(nextStock);
-        if (!active) return;
+        if (!active || generation !== refreshGeneration.current) return;
         setCategories(nextCategories);
         setStock(nextStock);
         setSubgroupsByGroup(nextSubgroupsByGroup);
@@ -108,7 +114,7 @@ export function SaleScreen() {
     && Number.isSafeInteger(baseCents) && Number.isSafeInteger(totalUnits);
 
   const openLine = (group: StoreStockItem, line?: CartLine) => {
-    if (locked.current) return;
+    if (locked.current || undoLocked.current || busy) return;
     const subgroups = subgroupsByGroup[group.id] ?? [];
     const subgroup = line
       ? subgroups.find((candidate) => candidate.subgroupId === line.subgroup.subgroupId) ?? null
@@ -122,13 +128,13 @@ export function SaleScreen() {
     setPrice(((line?.priceCents ?? group.priceCents) / 100).toFixed(2));
   };
   const updateCart = (next: CartLine[]) => {
-    if (locked.current) return;
+    if (locked.current || undoLocked.current || busy) return;
     requestId.current = saleRequestId();
     setLastReceipt(null);
     setCart(next);
   };
   const saveLine = () => {
-    if (!selectedGroup || !selectedSubgroup || !validLine || unitPrice === null || locked.current) return;
+    if (!selectedGroup || !selectedSubgroup || !validLine || unitPrice === null || locked.current || undoLocked.current || busy) return;
     const subgroupIndex = (subgroupsByGroup[selectedGroup.id] ?? []).findIndex((item) => item.subgroupId === selectedSubgroup.subgroupId);
     const line: CartLine = {
       key: editingKey ?? nextKey.current++,
@@ -147,16 +153,19 @@ export function SaleScreen() {
   };
 
   const cancelLine = () => {
+    if (locked.current || undoLocked.current || busy) return;
     setSelected(null);
     setSelectedSubgroupId(null);
     setEditingKey(null);
   };
   const completeSale = async () => {
-    if (locked.current || !validCart || selected) return;
+    if (locked.current || undoLocked.current || busy || !validCart || selected) return;
     locked.current = true;
-    setBusy(true);
+    setSaleBusy(true);
+    setSaleWriteBusy(true);
     setError(null);
     let saved = false;
+    let refreshVersion = 0;
     try {
       const receipt = await storeService.completeSale({
         requestId: requestId.current,
@@ -168,6 +177,8 @@ export function SaleScreen() {
         })),
       });
       saved = true;
+      locked.current = false;
+      setSaleWriteBusy(false);
       // Clear the charged cart before any refresh: a failed refresh must never offer to charge it again.
       setCart([]);
       requestId.current = saleRequestId();
@@ -181,33 +192,47 @@ export function SaleScreen() {
           return { totalCents: nextTotal, unitsSold: previous.unitsSold + receipt.unitsSold, costTotalCents, profitCents: costTotalCents === null ? null : nextTotal - costTotalCents };
         });
       }
+      refreshVersion = ++refreshGeneration.current;
       const [freshStock, today] = await Promise.all([
         storeService.listStockItems(),
         isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
       ]);
       const freshSubgroups = await loadCostSubgroupsByGroup(freshStock);
-      setStock(freshStock);
-      setSubgroupsByGroup(freshSubgroups);
-      if (today) setSummary(today);
+      if (refreshGeneration.current === refreshVersion) {
+        setStock(freshStock);
+        setSubgroupsByGroup(freshSubgroups);
+        if (today) setSummary(today);
+      }
     } catch (cause) {
       setError(saved ? 'Venta guardada. No se pudo actualizar la vista; vuelve a entrar para actualizarla.' : errorMessage(cause));
-      // The same reference survives a retry if the write succeeded but its response was interrupted.
-      const freshStock = await storeService.listStockItems().catch(() => null);
-      if (freshStock) {
-        setStock(freshStock);
-        const freshSubgroups = await loadCostSubgroupsByGroup(freshStock).catch(() => null);
-        if (freshSubgroups) setSubgroupsByGroup(freshSubgroups);
+      const generation = saved ? refreshVersion : ++refreshGeneration.current;
+      if (generation === refreshGeneration.current) {
+        const [freshStock, today] = await Promise.all([
+          storeService.listStockItems().catch(() => null),
+          isOwner ? storeService.getTodaySummary().catch(() => null) : Promise.resolve(null),
+        ]);
+        if (freshStock) {
+          const freshSubgroups = await loadCostSubgroupsByGroup(freshStock).catch(() => null);
+          if (generation === refreshGeneration.current) {
+            setStock(freshStock);
+            if (freshSubgroups) setSubgroupsByGroup(freshSubgroups);
+          }
+        }
+        if (today && generation === refreshGeneration.current) setSummary(today);
       }
     } finally {
       locked.current = false;
-      setBusy(false);
+      setSaleWriteBusy(false);
+      setSaleBusy(false);
     }
   };
   const undoSale = async (saleId: number) => {
-    if (locked.current) return;
-    locked.current = true;
-    setBusy(true);
+    if (undoLocked.current || saleWriteBusy || !undoNotice || undoNotice.saleId !== saleId
+      || Date.now() >= undoNotice.expiresAt) return;
+    undoLocked.current = true;
+    setUndoBusy(true);
     setError(null);
+    const generation = ++refreshGeneration.current;
     try {
       await storeService.undoSale(saleId);
       setUndoNotice(null);
@@ -219,27 +244,35 @@ export function SaleScreen() {
           isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
         ]);
         const freshSubgroups = await loadCostSubgroupsByGroup(freshStock);
-        setStock(freshStock);
-        setSubgroupsByGroup(freshSubgroups);
-        if (today) setSummary(today);
+        if (generation === refreshGeneration.current) {
+          setStock(freshStock);
+          setSubgroupsByGroup(freshSubgroups);
+          if (today) setSummary(today);
+        }
       } catch {
         setError('La venta se deshizo, pero no se pudo actualizar la vista. Vuelve a entrar para actualizarla.');
       }
     } catch (cause) {
       setError(errorMessage(cause));
-      const [freshStock, today] = await Promise.all([
-        storeService.listStockItems().catch(() => null),
-        isOwner ? storeService.getTodaySummary().catch(() => null) : Promise.resolve(null),
-      ]);
-      if (freshStock) {
-        setStock(freshStock);
-        const freshSubgroups = await loadCostSubgroupsByGroup(freshStock).catch(() => null);
-        if (freshSubgroups) setSubgroupsByGroup(freshSubgroups);
+      try {
+        const [freshStock, today] = await Promise.all([
+          storeService.listStockItems().catch(() => null),
+          isOwner ? storeService.getTodaySummary().catch(() => null) : Promise.resolve(null),
+        ]);
+        if (freshStock) {
+          const freshSubgroups = await loadCostSubgroupsByGroup(freshStock).catch(() => null);
+          if (generation === refreshGeneration.current) {
+            setStock(freshStock);
+            if (freshSubgroups) setSubgroupsByGroup(freshSubgroups);
+          }
+        }
+        if (today && generation === refreshGeneration.current) setSummary(today);
+      } catch {
+        // Preserve the undo error; the server operation is idempotent if the response was interrupted.
       }
-      if (today) setSummary(today);
     } finally {
-      locked.current = false;
-      setBusy(false);
+      undoLocked.current = false;
+      setUndoBusy(false);
     }
   };
   const hideUndoNotice = useCallback(() => setUndoNotice(null), []);
@@ -268,7 +301,7 @@ export function SaleScreen() {
       {undoNotice ? <SaleUndoNotification
         key={undoNotice.saleId}
         expiresAt={undoNotice.expiresAt}
-        busy={busy}
+        busy={undoBusy || saleWriteBusy}
         onUndo={() => void undoSale(undoNotice.saleId)}
         onHide={hideUndoNotice}
       /> : null}

@@ -13,10 +13,9 @@ export function SaleUndoNotification({ expiresAt, busy, onUndo, onHide }: Props)
   const { theme } = useTheme();
 
   useEffect(() => {
-    if (busy) return undefined;
     const timer = setTimeout(onHide, Math.max(0, expiresAt - Date.now()));
     return () => clearTimeout(timer);
-  }, [busy, expiresAt, onHide]);
+  }, [expiresAt, onHide]);
 
   return (
     <View accessibilityLiveRegion="polite" style={[styles.notice, { backgroundColor: theme.colors.success, borderRadius: theme.radius.md }]}>
