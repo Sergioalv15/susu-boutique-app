@@ -9,7 +9,7 @@ Risk: item 2 (authorization and privileged membership writes).
 
 ## Tasks
 - T1 — S1–S2 — Add owner-authorized RPC to activate an existing Auth account by email and role, with isolated SQL regression tests — done (3 new PGlite tests and 4 existing tests pass; typecheck passes) — inline — commit: 06b507f.
-- T2 — S1–S3 — Replace the app header sign-out button with an accessible menu; add owner-only Settings form wired to the RPC, improve validation/error feedback, and verify the feature — in_progress — inline — commit: 03fa4b7 plus follow-up pending.
+- T2 — S1–S3 — Replace the app header sign-out button with an accessible menu; add owner-only Settings form wired to the RPC, improve validation/error feedback, and verify the feature — done (focused tests 9/9; full suite 52 files/255 tests; typecheck and diff check pass) — inline — commits: 03fa4b7, da23572.
 - T3 — S1–S2 — Complete one independent security review of the membership RPC — blocked (verifier launch failed before probes; waiting for an explicit user request for a new bounded attempt) — independent verifier — commit: n/a.
 
 ## Log
@@ -27,3 +27,4 @@ Risk: item 2 (authorization and privileged membership writes).
 - L12: User reports applying the migration to dev. Read-only exploration found known SQL errors already mapped (`P0001`, `23505`, `42501`, `22023`); the generic fallback applies to unknown codes or rejected RPC calls. Apply a bounded UI-only error-handling improvement; no remote calls.
 - L13: Test-first RED: `npm test -- src/core/auth/businessMemberActivation.test.ts` failed 6 of 9 tests before implementation. Failures covered malformed email validation, `22023`, missing RPC codes (`PGRST202`, `42883`), expired session (`PGRST301`), unknown safe code reporting, and network fallback wording; the 3 prior cases passed.
 - L14: Implemented email-shape validation before the RPC; mapped `PGRST202`/`42883` to migration/project guidance and `PGRST301` to reauthentication guidance; unknown safe error codes are shown without raw server messages, while rejected calls get a connection-specific message. Focused tests pass 9/9, full suite passes 52 files/255 tests, typecheck and diff check pass. No hosted call was made.
+- L15: Committed the user-requested error-handling follow-up as `da23572 fix(auth): improve activation error feedback` (69 authored changed lines). This is a separate small code slice, superseding the earlier plan to make only a documentation follow-up; total feature work is now 690 authored lines across four commits, with no PR/push. T3 independent security review remains blocked.
