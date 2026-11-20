@@ -75,6 +75,73 @@ export function StoreCard({
   );
 }
 
+type StockCostSubgroupRowProps = {
+  subgroup: StockCostSubgroup;
+  index: number;
+  isOwner: boolean;
+  disabled: boolean;
+  selected: boolean;
+  onSelect?: (subgroup: StockCostSubgroup) => void;
+  onCorrectCost?: (subgroup: StockCostSubgroup) => void;
+  onRemoveUnits?: (subgroup: StockCostSubgroup) => void;
+};
+
+function StockCostSubgroupRow({
+  subgroup,
+  index,
+  isOwner,
+  disabled,
+  selected,
+  onSelect,
+  onCorrectCost,
+  onRemoveUnits,
+}: StockCostSubgroupRowProps) {
+  const { theme } = useTheme();
+  const display = describeStockCostSubgroup(subgroup, index, isOwner);
+  const costDescription = display.unitCostCents === undefined
+    ? null
+    : display.unitCostCents === null
+      ? 'Coste de compra desconocido'
+      : `${formatEuros(display.unitCostCents)} por unidad`;
+  const accessibleDescription = [display.label, `${subgroup.remainingUnits} unidades disponibles`, costDescription]
+    .filter(Boolean)
+    .join(', ');
+  const actionDisabled = disabled;
+
+  return (
+    <StoreCard
+      onPress={onSelect ? () => onSelect(subgroup) : undefined}
+      disabled={actionDisabled}
+      selected={selected}
+      accessibilityLabel={accessibleDescription}
+    >
+      <Text style={[styles.subgroupLabel, { color: theme.colors.text }]}>{display.label}</Text>
+      <Text style={[styles.subgroupDetails, { color: theme.colors.mutedText }]}>{subgroup.remainingUnits} unidades disponibles</Text>
+      {costDescription ? <Text style={[styles.subgroupDetails, { color: theme.colors.mutedText }]}>{costDescription}</Text> : null}
+      {isOwner && (onCorrectCost || onRemoveUnits) ? <View style={styles.subgroupActions}>
+        {onCorrectCost ? <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Corregir coste de ${display.label}`}
+          disabled={actionDisabled}
+          onPress={() => onCorrectCost(subgroup)}
+          style={({ pressed }) => [styles.subgroupAction, { borderColor: theme.colors.border }, pressed ? styles.pressed : null]}
+        >
+          <Text style={[styles.subgroupActionLabel, { color: theme.colors.primary }]}>Corregir coste</Text>
+        </Pressable> : null}
+        {onRemoveUnits ? <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Retirar unidades de ${display.label}`}
+          disabled={actionDisabled}
+          onPress={() => onRemoveUnits(subgroup)}
+          style={({ pressed }) => [styles.subgroupAction, { borderColor: theme.colors.border }, pressed ? styles.pressed : null]}
+        >
+          <Text style={[styles.subgroupActionLabel, { color: theme.colors.danger }]}>Retirar unidades</Text>
+        </Pressable> : null}
+      </View> : null}
+    </StoreCard>
+  );
+}
+
 export function StockCostSubgroupList({
   subgroups,
   isOwner,
@@ -83,6 +150,8 @@ export function StockCostSubgroupList({
   error = null,
   selectedSubgroupId,
   onSelect,
+  onCorrectCost,
+  onRemoveUnits,
   disabled = false,
 }: {
   subgroups: StockCostSubgroup[];
@@ -92,39 +161,32 @@ export function StockCostSubgroupList({
   error?: string | null;
   selectedSubgroupId?: string | null;
   onSelect?: (subgroup: StockCostSubgroup) => void;
+  onCorrectCost?: (subgroup: StockCostSubgroup) => void;
+  onRemoveUnits?: (subgroup: StockCostSubgroup) => void;
   disabled?: boolean;
 }) {
   const { theme } = useTheme();
+  const showSubgroups = !loading && !error;
+
   return (
     <View style={styles.subgroupList}>
       <Text style={[styles.subgroupTitle, { color: theme.colors.text }]}>{title}</Text>
       {loading ? <StoreMessage message="Cargando subgrupos…" /> : null}
       {error ? <StoreMessage message={error} error /> : null}
-      {!loading && !error && subgroups.length === 0 ? <StoreMessage message="No hay subgrupos con unidades disponibles." /> : null}
-      {!loading && !error ? subgroups.map((subgroup, index) => {
-        const display = describeStockCostSubgroup(subgroup, index, isOwner);
-        const costDescription = display.unitCostCents === undefined
-          ? null
-          : display.unitCostCents === null
-            ? 'Coste de compra desconocido'
-            : `${formatEuros(display.unitCostCents)} por unidad`;
-        const accessibleDescription = [display.label, `${subgroup.remainingUnits} unidades disponibles`, costDescription]
-          .filter(Boolean)
-          .join(', ');
-        return (
-          <StoreCard
-            key={subgroup.subgroupId}
-            onPress={onSelect ? () => onSelect(subgroup) : undefined}
-            disabled={disabled || loading || Boolean(error)}
-            selected={selectedSubgroupId === subgroup.subgroupId}
-            accessibilityLabel={accessibleDescription}
-          >
-            <Text style={[styles.subgroupLabel, { color: theme.colors.text }]}>{display.label}</Text>
-            <Text style={[styles.subgroupDetails, { color: theme.colors.mutedText }]}>{subgroup.remainingUnits} unidades disponibles</Text>
-            {costDescription ? <Text style={[styles.subgroupDetails, { color: theme.colors.mutedText }]}>{costDescription}</Text> : null}
-          </StoreCard>
-        );
-      }) : null}
+      {showSubgroups && subgroups.length === 0 ? <StoreMessage message="No hay subgrupos con unidades disponibles." /> : null}
+      {showSubgroups ? subgroups.map((subgroup, index) => (
+        <StockCostSubgroupRow
+          key={subgroup.subgroupId}
+          subgroup={subgroup}
+          index={index}
+          isOwner={isOwner}
+          disabled={disabled || loading || Boolean(error)}
+          selected={selectedSubgroupId === subgroup.subgroupId}
+          onSelect={onSelect}
+          onCorrectCost={onCorrectCost}
+          onRemoveUnits={onRemoveUnits}
+        />
+      )) : null}
     </View>
   );
 }
@@ -214,6 +276,23 @@ const styles = StyleSheet.create({
   },
   subgroupDetails: {
     fontSize: 14,
+  },
+  subgroupActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  subgroupAction: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  subgroupActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   pressed: {
     opacity: 0.72,
