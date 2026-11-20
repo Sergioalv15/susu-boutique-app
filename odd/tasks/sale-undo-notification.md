@@ -8,8 +8,8 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 
 ## Tasks
 - T1 — S1–S2 — Persist exact FIFO lot allocations and add an idempotent, authorized audit reversal that restores those lots, preserves original sales/movements, and excludes reversed sales from net summaries — done (focused PGlite undo/history/security cases and two sale regressions pass) — inline — commit: 85fb4a4.
-- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (timer 1/1, retry PGlite 2/2, StoreService 5/5, typecheck and web build pass) — inline — commits: bcec354, 0c04246, 317205e; stale-refresh fix commit pending.
-- T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (the final authorized suite timed out and the final review noted a stale-error caveat; after correction, a new bounded attempt requires explicit user request) — independent verifier — commit: pending.
+- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (timer 1/1, retry PGlite 2/2, StoreService 5/5, typecheck and web build pass) — inline — commits: bcec354, 0c04246, 317205e, daa83a6.
+- T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (the final authorized suite timed out at 30 seconds; review findings were fixed, but a new bounded full-suite/review attempt requires explicit user request) — independent verifier — commit: pending.
 
 ## Log
 - L1: Necesito poder hacer undo de las compras. Es decir: En venta, al realizar una venta, quiero que aparezca una notificacion para poder deshacer la ultima venta que se hizo.
@@ -43,3 +43,5 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 - L29: The explicitly authorized final full `npm test` run timed out again at 30 seconds before a summary. This consumes the final full-suite attempt; no further full test run is authorized or planned. One independent review attempt remains authorized.
 - L30: The final read-only review found no further S1, but noted that a stale success-path undo-refresh failure can set an outdated error after a newer refresh. Add a generation guard to that catch before considering T2 complete; no runtime probes were run.
 - L31: Added a refresh-generation guard before publishing the undo success-path refresh error, preventing a stale failure from replacing newer state. This is a small UI-state correction (Risk: item 4). Typecheck and web build pass; full-suite/review attempts remain exhausted.
+- L32: Stale refresh-error correction committed as `daa83a6` (9 changed lines). Typecheck, web build, and diff check pass. The remaining full-suite and independent-review proof is blocked and requires a new explicit user request; no hosted migration was applied.
+- L33: The final independent review's stale-error caveat was fixed in `daa83a6`. Focused PGlite and timer tests, StoreService tests (5/5), typecheck, and web build pass; the full suite timed out before summary and no review was rerun. No hosted migration was applied.
