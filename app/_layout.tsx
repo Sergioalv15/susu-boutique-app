@@ -4,7 +4,7 @@ import { AppProviders } from '../src/core/providers/AppProviders';
 import { createRootStackScreenOptions } from '../src/core/navigation/rootStackScreenOptions';
 import { rootStackRoutes } from '../src/core/navigation/rootStackRoutes';
 import { useTheme } from '../src/core/theme/ThemeProvider';
-import { SignOutButton } from '../src/core/navigation/SignOutButton';
+import { AppHeaderMenu } from '../src/core/navigation/AppHeaderMenu';
 
 function RootNavigationLayout() {
   const { theme } = useTheme();
@@ -15,7 +15,7 @@ function RootNavigationLayout() {
       <Stack
         screenOptions={{
           ...createRootStackScreenOptions(theme),
-          headerRight: () => <SignOutButton />,
+          headerRight: () => <AppHeaderMenu />,
         }}
       >
         {rootStackRoutes.map((route) => (
