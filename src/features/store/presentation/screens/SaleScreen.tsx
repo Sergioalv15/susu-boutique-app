@@ -204,9 +204,9 @@ export function SaleScreen() {
         if (today) setSummary(today);
       }
     } catch (cause) {
-      setError(saved ? 'Venta guardada. No se pudo actualizar la vista; vuelve a entrar para actualizarla.' : errorMessage(cause));
       const generation = saved ? refreshVersion : ++refreshGeneration.current;
       if (generation === refreshGeneration.current) {
+        setError(saved ? 'Venta guardada. No se pudo actualizar la vista; vuelve a entrar para actualizarla.' : errorMessage(cause));
         const [freshStock, today] = await Promise.all([
           storeService.listStockItems().catch(() => null),
           isOwner ? storeService.getTodaySummary().catch(() => null) : Promise.resolve(null),

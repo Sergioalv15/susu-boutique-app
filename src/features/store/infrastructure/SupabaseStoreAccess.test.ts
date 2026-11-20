@@ -529,12 +529,36 @@ describe('Supabase store RPC role boundaries', () => {
     ));
     expect(restored.rows).toEqual([{ subgroup_id: originalSubgroupId, remaining_units: 5, unit_cost_cents: 400 }]);
 
-    await expect(callSaleItems(db, ownerId, requestId, items)).resolves.toEqual(sale);
+    const retry = await callSaleItems(db, ownerId, requestId, items);
+    expect(retry).toMatchObject({ saleId, undoAvailable: false, totalCents: sale.totalCents });
     await expect(callUndo(db, ownerId, saleId)).resolves.toEqual(firstUndo);
     await expect(asUser(db, ownerId, async () => db.query(
       'select subgroup_id, remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
       [priceGroupId],
     ))).resolves.toMatchObject({ rows: [{ subgroup_id: originalSubgroupId, remaining_units: 5 }] });
+  });
+
+  it('does not advertise undo on an idempotent retry by another seller or after expiry', async () => {
+    const requestId = 'undo-retry-window';
+    const items = [{ priceGroupId, units: 1 }];
+    const sale = await callSaleItems(db, ownerId, requestId, items);
+    expect(sale).toHaveProperty('undoAvailable', true);
+
+    const staffRetry = await callSaleItems(db, staffId, requestId, items);
+    expect(staffRetry).toMatchObject({ saleId: sale.saleId, undoAvailable: false });
+    expect(staffRetry).not.toHaveProperty('costTotalCents');
+
+    await db.query(
+      "update public.store_sales set sold_at = now() - interval '31 seconds' where id = $1::bigint",
+      [Number(sale.saleId)],
+    );
+    const expiredRetry = await callSaleItems(db, ownerId, requestId, items);
+    expect(expiredRetry).toMatchObject({ saleId: sale.saleId, undoAvailable: false });
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ remaining_units: number }>(
+      'select remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    expect(rows).toEqual([{ remaining_units: 1 }]);
   });
 
   it('allows a seller to undo their own sale but not another seller\'s sale', async () => {

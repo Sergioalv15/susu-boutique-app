@@ -99,7 +99,18 @@ begin
       if v_existing.request_payload is distinct from p_items then
         raise exception using errcode = 'P0001', message = 'Request id was already used for a different sale.';
       end if;
-      return v_existing.request_receipt;
+      v_receipt := v_existing.request_receipt;
+      if v_receipt is not null and (
+        v_existing.created_by_user_id is distinct from auth.uid()
+        or v_existing.sold_at < now() - interval '30 seconds'
+        or exists (
+          select 1 from public.store_sale_reversals as reversal
+          where reversal.business_id = v_existing.business_id and reversal.sale_id = v_existing.id
+        )
+      ) then
+        v_receipt := jsonb_set(v_receipt, '{undoAvailable}', 'false'::jsonb, true);
+      end if;
+      return v_receipt;
     end if;
   end if;
 
