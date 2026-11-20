@@ -250,7 +250,9 @@ export function SaleScreen() {
           if (today) setSummary(today);
         }
       } catch {
-        setError('La venta se deshizo, pero no se pudo actualizar la vista. Vuelve a entrar para actualizarla.');
+        if (generation === refreshGeneration.current) {
+          setError('La venta se deshizo, pero no se pudo actualizar la vista. Vuelve a entrar para actualizarla.');
+        }
       }
     } catch (cause) {
       setError(errorMessage(cause));
