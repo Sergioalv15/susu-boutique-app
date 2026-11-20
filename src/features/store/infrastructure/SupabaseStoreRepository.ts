@@ -147,7 +147,7 @@ function parseImageDataUrl(dataUrl: string): { contentType: string; extension: s
   return { contentType, extension, bytes: decodeBase64(match[2]) };
 }
 
-async function getCurrentBusinessId(): Promise<string> {
+export async function getCurrentBusinessId(): Promise<string> {
   const client = getSupabaseClient();
   const { data: userResult, error: userError } = await client.auth.getUser();
   if (userError) throw userError;
@@ -162,7 +162,7 @@ async function getCurrentBusinessId(): Promise<string> {
   return data.business_id;
 }
 
-async function uploadProductImage(dataUrl: string, businessId: string): Promise<string> {
+export async function uploadProductImage(dataUrl: string, businessId: string): Promise<string> {
   const image = parseImageDataUrl(dataUrl);
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${image.extension}`;
   const path = `${businessId}/${uniqueName}`;
@@ -176,7 +176,7 @@ async function uploadProductImage(dataUrl: string, businessId: string): Promise<
   return path;
 }
 
-async function removeProductImage(path: string): Promise<void> {
+export async function removeProductImage(path: string): Promise<void> {
   await getSupabaseClient().storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
 }
 
