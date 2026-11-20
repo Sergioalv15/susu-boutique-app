@@ -9,9 +9,9 @@ Risk: item 1 (stock and sale cost provenance); item 2 (purchase-cost confidentia
 
 ## Tasks
 - T1 — S1–S3 — Expose purchase-cost subgroups from existing stock lots and show them inside each inventory sale-price group; retain cost visibility for owners only — done (focused subgroup/store tests 32/32; typecheck and diff check pass) — inline — commit: 78fd517.
-- T2 — S2–S3 — Add subgroup selection to the sale line and cart; show neutral subgroup/count labels to staff and purchase-cost labels to owners — done (sale normalization and subgroup-reservation tests 5/5; typecheck and diff check pass) — inline — commit: pending.
+- T2 — S2–S3 — Add subgroup selection to the sale line and cart; show neutral subgroup/count labels to staff and purchase-cost labels to owners — done (sale normalization and subgroup-reservation tests 5/5; typecheck and diff check pass) — inline — commit: b2c181a.
 - T3 — S2–S3 — Constrain SQLite and Supabase sale transactions to the chosen subgroup, preserve FIFO within that subgroup, request idempotency, and legacy no-subgroup callers — done (focused SQLite/PGlite/domain suite 39/39; typecheck and diff check pass) — inline — commit: eedf1e5.
-- T4 — S1–S3 — Verify subgroup access, stale-stock and concurrent sale behavior; run the full checks and independent security review — in_progress — independent verifier — commit: pending.
+- T4 — S1–S3 — Verify subgroup access, stale-stock and concurrent sale behavior; run the full checks and independent security review — blocked (verifier setup failed before probes; waiting for explicit user request for one bounded retry after setup correction) — independent verifier — commit: n/a.
 
 ## Log
 - L1: tenemos que hacer sub-grupos dentro de cada grupo de euros. Es decir, 20 unidades de anillos a 5 euros comprados a 2,50 no son lo mismo que 20 unidades a 5 euros comprados a 1,50. Actualmente la app une esos dos independientemente del precio de compra de cada unidad
@@ -37,3 +37,4 @@ Risk: item 1 (stock and sale cost provenance); item 2 (purchase-cost confidentia
 - L21: Parent verification passed: `npm test` (54 files/271 tests), `npm run typecheck`, `npm run build:web`, and `git diff --check`; the added foreign-price-group token regression passes. No hosted Supabase call was made.
 - L22: Delivery slices: T1 inventory read/display is commit `78fd517`; T3 transaction semantics (SQL migration plus SQLite/PGlite tests) is a separate high-risk commit; T2 sale UI and README documentation is a separate dependent commit. No PR or push is authorized.
 - L23: Committed T3 as `eedf1e5 feat(store): consume selected purchase-cost subgroup` (518 authored changed lines, about 118 over the ~400-line target). T2 remains a separate smaller UI/documentation commit; no more implementation will be added to T3, and no PR/push is planned.
+- L24: Committed T2 as `b2c181a feat(store): select purchase-cost subgroup at sale` (154 authored changed lines). Full suite passes (54 files/271 tests), typecheck, web build, and diff check pass; focused subgroup tests pass. The new SQL migrations have not been applied to hosted Supabase. T4 remains blocked because the independent verifier ran zero tests; no push or PR was created.
