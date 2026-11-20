@@ -8,7 +8,7 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 
 ## Tasks
 - T1 — S1–S2 — Persist exact FIFO lot allocations and add an idempotent, authorized audit reversal that restores those lots, preserves original sales/movements, and excludes reversed sales from net summaries — done (focused PGlite undo/history/security cases and two sale regressions pass) — inline — commit: 85fb4a4.
-- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (StoreService tests 5/5, typecheck, web build pass) — inline — commit: pending.
+- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (StoreService tests 5/5, typecheck, web build pass) — inline — commit: bcec354.
 - T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (waits for a new bounded attempt; previous verifier setup failed before probes and full suite timed out at 30 seconds) — independent verifier — commit: pending.
 
 ## Log
@@ -26,3 +26,4 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 - L12: T1 is committed as `85fb4a4` (750 changed lines including migration, end-to-end PGlite cases, and feature log). This is the backend behavior boundary; the next UI/service slice remains independent and should stay below ~400 lines. `app.json` was not staged.
 - L13: Wired `StoreService.undoSale`, the Supabase `undo_store_sale` repository call/result mapping, receipt eligibility mapping, and the temporary accessible `SaleUndoNotification` action in `SaleScreen.tsx`. Service tests pass 4/4, typecheck and diff check pass; full suite and web build remain pending.
 - L14: Added invalid-ID/unsupported-storage service guards and updated the README. The focused StoreService suite now passes 5/5; `npm run typecheck` and `npm run build:web` pass. One full `npm test` attempt timed out at 30 seconds before printing a summary; it was not retried. Independent review remains unrequested after the earlier verifier setup failure.
+- L15: T2 is committed as `bcec354` (215 changed lines; StoreService tests 5/5, typecheck, and web build pass). The only remaining work is bounded verification; `app.json` remains unstaged.
