@@ -8,7 +8,7 @@ Risk: item 2 (authorization and privileged membership writes).
 
 ## Tasks
 - T1 — S1–S2 — Add owner-authorized RPC to activate an existing Auth account by email and role, with isolated SQL regression tests — done (3 new PGlite tests and 4 existing tests pass; typecheck passes) — inline — commit: 06b507f.
-- T2 — S1–S2 — Replace the app header sign-out button with an accessible menu; add owner-only Settings form wired to the RPC and verify the feature — done (focused tests 13/13; full suite 52 files/250 tests; typecheck, web export, and diff check pass) — inline — commit: pending.
+- T2 — S1–S2 — Replace the app header sign-out button with an accessible menu; add owner-only Settings form wired to the RPC and verify the feature — done (focused tests 13/13; full suite 52 files/250 tests; typecheck, web export, and diff check pass) — inline — commit: 03fa4b7.
 - T3 — S1–S2 — Complete one independent security review of the membership RPC — blocked (verifier launch failed before probes; waiting for an explicit user request for a new bounded attempt) — independent verifier — commit: n/a.
 
 ## Log
@@ -21,3 +21,4 @@ Risk: item 2 (authorization and privileged membership writes).
 - L7: A worker launch for the small header wiring was rejected before starting because prose followed the required `## Allowed edit surfaces` block. No child ran or edited files; the parent completed the two header wiring edits inline and did not relaunch.
 - L8: Committed T1 as `06b507f feat(auth): add owner membership activation RPC` on `feat/owner-access-management`.
 - L9: T2 replaces both app header sign-out controls with the hamburger menu, registers the hidden Settings tab route behind `OwnerOnlyRoute`, and adds the existing-account/role form plus RPC error feedback. Focused feature tests pass (13/13); full suite passes (52 files/250 tests); `npm run typecheck`, `npm run build:web`, and `git diff --check` pass. LSP reported no diagnostics but could not confirm files clean (all 9 results inconclusive). No hosted Supabase migration was applied.
+- L10: Committed T2 as `03fa4b7 feat(settings): manage existing business access`. This UI slice contains 499 authored changed lines, about 99 above the ~400-line target; T1 remains a separate 127-line security/database slice. Record this slice boundary and limit any follow-up commit to task evidence only; no PR or push was requested. T3 independent security verification remains blocked; do not present the feature as fully verified.
