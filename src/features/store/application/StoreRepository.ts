@@ -5,6 +5,7 @@ import {
   CreatePriceGroupInput,
   ReceiveStockInput,
   SaleReceipt,
+  SaleUndoResult,
   StockMovement,
   StoreCategory,
   StorePriceGroup,
@@ -25,6 +26,7 @@ export interface StoreRepository {
   receiveStock(input: ReceiveStockInput): Promise<StorePriceGroup>;
   addStock(input: AddStoreStockInput): Promise<StorePriceGroup>;
   completeSale(input: CompleteSaleInput): Promise<SaleReceipt>;
+  undoSale?(saleId: number): Promise<SaleUndoResult>;
   getTodaySummary(date: string): Promise<TodaySalesSummary>;
   listRecentMovements(limit?: number): Promise<StockMovement[]>;
 }

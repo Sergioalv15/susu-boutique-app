@@ -41,6 +41,7 @@ function createRepository(): StoreRepository {
       totalCents: 300,
       remainingUnits: 4,
     })),
+    undoSale: vi.fn(async (saleId) => ({ saleId, status: 'undone' as const, unitsRestored: 1 })),
     getTodaySummary: vi.fn(async () => ({ totalCents: 0, unitsSold: 0 })),
     listRecentMovements: vi.fn(async () => []),
   };
@@ -64,6 +65,25 @@ describe('StoreService', () => {
 
     expect(repository.listStockCostSubgroups).toHaveBeenCalledWith(7);
     expect(() => service.listStockCostSubgroups(0)).toThrow('grupo de precio válido');
+  });
+
+  it('undoes a sale by the receipt id through the repository', async () => {
+    const repository = createRepository();
+    const service = new StoreService(repository);
+
+    await expect(service.undoSale(7)).resolves.toMatchObject({ saleId: 7, status: 'undone' });
+    expect(repository.undoSale).toHaveBeenCalledWith(7);
+  });
+
+  it('rejects invalid undo ids and unsupported repositories', () => {
+    const repository = createRepository();
+    const service = new StoreService(repository);
+    expect(() => service.undoSale(0)).toThrow('identificador de venta');
+    expect(repository.undoSale).not.toHaveBeenCalled();
+
+    const unsupported = createRepository();
+    delete unsupported.undoSale;
+    expect(() => new StoreService(unsupported).undoSale(7)).toThrow('no está disponible');
   });
 
   it('rejects invalid categories, prices, quantities, and sales', async () => {

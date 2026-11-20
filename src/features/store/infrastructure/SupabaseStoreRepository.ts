@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../../../core/backend/supabaseClient';
-import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, StoreCategory, StorePriceGroup, StoreStockItem, StockCostSubgroup, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
+import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, SaleUndoResult, StoreCategory, StorePriceGroup, StoreStockItem, StockCostSubgroup, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
 import { StoreRepository } from '../application/StoreRepository';
 import { normalizeSale } from '../domain/salePricing';
 import { nonnegativeTotal } from '../domain/stockCost';
@@ -63,6 +63,7 @@ type RpcSaleReceipt = {
   remainingUnits: number;
   costTotalCents?: number | string | null;
   profitCents?: number | string | null;
+  undoAvailable?: boolean;
   items: Array<{
     priceGroupId: number | string;
     units: number;
@@ -72,6 +73,12 @@ type RpcSaleReceipt = {
     remainingUnits: number;
     costTotalCents?: number | string | null;
   }>;
+};
+
+type RpcSaleUndoResult = {
+  saleId: number | string;
+  status: string;
+  unitsRestored: number | string;
 };
 
 function numberValue(value: number | string | null): number | null {
@@ -112,8 +119,19 @@ function mapSaleReceipt(row: RpcSaleReceipt): SaleReceipt {
     remainingUnits: row.remainingUnits,
     ...(row.costTotalCents !== undefined ? { costTotalCents: numberValue(row.costTotalCents) } : {}),
     ...(row.profitCents !== undefined ? { profitCents: numberValue(row.profitCents) } : {}),
+    undoAvailable: row.undoAvailable === true,
     items,
   };
+}
+
+function mapSaleUndoResult(row: RpcSaleUndoResult): SaleUndoResult {
+  const saleId = Number(row.saleId);
+  const unitsRestored = Number(row.unitsRestored);
+  if (row.status !== 'undone' || !Number.isSafeInteger(saleId) || saleId <= 0
+    || !Number.isSafeInteger(unitsRestored) || unitsRestored <= 0) {
+    throw new Error('La respuesta de deshacer la venta no es válida.');
+  }
+  return { saleId, status: 'undone', unitsRestored };
 }
 
 function decodeBase64(value: string): Uint8Array {
@@ -356,6 +374,12 @@ export class SupabaseStoreRepository implements StoreRepository {
     });
     if (error) throw error;
     return mapSaleReceipt(data as RpcSaleReceipt);
+  }
+
+  async undoSale(saleId: number): Promise<SaleUndoResult> {
+    const { data, error } = await getSupabaseClient().rpc('undo_store_sale', { p_sale_id: saleId });
+    if (error) throw error;
+    return mapSaleUndoResult(data as RpcSaleUndoResult);
   }
 
   async getTodaySummary(date: string): Promise<TodaySalesSummary> {

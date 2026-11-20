@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { useFocusEffect } from 'expo-router';
 import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
+import { Toast } from '../../../../ui/components/Toast';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
 import { useBusinessRole } from '../../../../core/auth/AuthGate';
 import { SaleReceipt, StockCostSubgroup, StoreCategory, StoreStockItem, TodaySalesSummary } from '../../domain/types';
@@ -11,6 +12,7 @@ import { parseSalePrice } from '../../domain/salePricing';
 import { remainingSubgroupUnits } from '../../domain/saleSubgroups';
 import { storeService } from '../../infrastructure/container';
 import { formatEuros, grossProfitLabel, QuantityStepper, StockCostSubgroupList, StoreCard, StoreMessage } from '../components/StoreComponents';
+import { SaleUndoNotification } from '../components/SaleUndoNotification';
 
 type CartLine = { key: number; group: StoreStockItem; subgroup: StockCostSubgroup; subgroupLabel: string; units: number; agreed: boolean; priceCents: number };
 function errorMessage(error: unknown): string {
@@ -19,6 +21,8 @@ function errorMessage(error: unknown): string {
 function saleRequestId(): string {
   return `sale-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
+
+const SALE_UNDO_NOTICE_MS = 8_000;
 
 async function loadCostSubgroupsByGroup(stockItems: StoreStockItem[]): Promise<Record<number, StockCostSubgroup[]>> {
   const entries = await Promise.all(stockItems.map(async (item) => [
@@ -51,6 +55,8 @@ export function SaleScreen() {
   const [price, setPrice] = useState('');
   const [summary, setSummary] = useState<TodaySalesSummary>({ totalCents: 0, unitsSold: 0 });
   const [lastReceipt, setLastReceipt] = useState<SaleReceipt | null>(null);
+  const [undoNotice, setUndoNotice] = useState<{ saleId: number; expiresAt: number } | null>(null);
+  const [undoConfirmation, setUndoConfirmation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -166,6 +172,7 @@ export function SaleScreen() {
       setCart([]);
       requestId.current = saleRequestId();
       setLastReceipt(receipt);
+      setUndoNotice(receipt.undoAvailable ? { saleId: receipt.saleId, expiresAt: Date.now() + SALE_UNDO_NOTICE_MS } : null);
       setCategory(null);
       if (isOwner) {
         setSummary((previous) => {
@@ -196,6 +203,47 @@ export function SaleScreen() {
       setBusy(false);
     }
   };
+  const undoSale = async (saleId: number) => {
+    if (locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      await storeService.undoSale(saleId);
+      setUndoNotice(null);
+      setLastReceipt(null);
+      setUndoConfirmation(true);
+      try {
+        const [freshStock, today] = await Promise.all([
+          storeService.listStockItems(),
+          isOwner ? storeService.getTodaySummary() : Promise.resolve(null),
+        ]);
+        const freshSubgroups = await loadCostSubgroupsByGroup(freshStock);
+        setStock(freshStock);
+        setSubgroupsByGroup(freshSubgroups);
+        if (today) setSummary(today);
+      } catch {
+        setError('La venta se deshizo, pero no se pudo actualizar la vista. Vuelve a entrar para actualizarla.');
+      }
+    } catch (cause) {
+      setError(errorMessage(cause));
+      const [freshStock, today] = await Promise.all([
+        storeService.listStockItems().catch(() => null),
+        isOwner ? storeService.getTodaySummary().catch(() => null) : Promise.resolve(null),
+      ]);
+      if (freshStock) {
+        setStock(freshStock);
+        const freshSubgroups = await loadCostSubgroupsByGroup(freshStock).catch(() => null);
+        if (freshSubgroups) setSubgroupsByGroup(freshSubgroups);
+      }
+      if (today) setSummary(today);
+    } finally {
+      locked.current = false;
+      setBusy(false);
+    }
+  };
+  const hideUndoNotice = useCallback(() => setUndoNotice(null), []);
+  const hideUndoConfirmation = useCallback(() => setUndoConfirmation(false), []);
   const colors = { color: theme.colors.text };
 
   return (
@@ -217,6 +265,14 @@ export function SaleScreen() {
           </Text>
         </> : null}
       </View> : null}
+      {undoNotice ? <SaleUndoNotification
+        key={undoNotice.saleId}
+        expiresAt={undoNotice.expiresAt}
+        busy={busy}
+        onUndo={() => void undoSale(undoNotice.saleId)}
+        onHide={hideUndoNotice}
+      /> : null}
+      {undoConfirmation ? <Toast message="Venta deshecha." onHide={hideUndoConfirmation} /> : null}
       {error ? <StoreMessage message={error} error /> : null}
       {loading ? <ActivityIndicator color={theme.colors.primary} /> : null}
       {!loading && selectedGroup ? <View style={styles.quantityScreen}>

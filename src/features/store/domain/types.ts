@@ -65,6 +65,13 @@ export interface SaleReceipt {
   items?: SaleReceiptItem[];
   costTotalCents?: number | null;
   profitCents?: number | null;
+  undoAvailable?: boolean;
+}
+
+export interface SaleUndoResult {
+  saleId: number;
+  status: 'undone';
+  unitsRestored: number;
 }
 
 export interface SaleReceiptItem {

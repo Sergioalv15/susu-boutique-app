@@ -6,6 +6,7 @@ import {
   CreatePriceGroupInput,
   ReceiveStockInput,
   SaleReceipt,
+  SaleUndoResult,
   StockMovement,
   StoreCategory,
   StorePriceGroup,
@@ -95,6 +96,16 @@ export class StoreService {
   completeSale(input: CompleteSaleInput): Promise<SaleReceipt> {
     normalizeSale(input);
     return this.repository.completeSale(input);
+  }
+
+  undoSale(saleId: number): Promise<SaleUndoResult> {
+    if (!Number.isSafeInteger(saleId) || saleId <= 0) {
+      throw new RangeError('El identificador de venta no es válido.');
+    }
+    if (!this.repository.undoSale) {
+      throw new Error('Deshacer ventas no está disponible en este almacenamiento.');
+    }
+    return this.repository.undoSale(saleId);
   }
 
   getTodaySummary(now = new Date()): Promise<TodaySalesSummary> {
