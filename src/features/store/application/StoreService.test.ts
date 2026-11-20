@@ -6,6 +6,7 @@ function createRepository(): StoreRepository {
   return {
     listCategories: vi.fn(async () => []),
     listStockItems: vi.fn(async () => []),
+    listStockCostSubgroups: vi.fn(async () => []),
     getDashboardSummary: vi.fn(async () => ({ unitsSold: 0, revenueCents: 0, soldCostCents: 0 })),
     createCategory: vi.fn(async (input) => ({ id: 1, name: input.name, sortOrder: 0 })),
     listPriceGroups: vi.fn(async () => []),
@@ -53,6 +54,16 @@ describe('StoreService', () => {
     await service.createCategory({ name: '  Anillos  ' });
 
     expect(repository.createCategory).toHaveBeenCalledWith({ name: 'Anillos' });
+  });
+
+  it('lists cost subgroups for a valid price group and rejects invalid group ids', async () => {
+    const repository = createRepository();
+    const service = new StoreService(repository);
+
+    await service.listStockCostSubgroups(7);
+
+    expect(repository.listStockCostSubgroups).toHaveBeenCalledWith(7);
+    expect(() => service.listStockCostSubgroups(0)).toThrow('grupo de precio válido');
   });
 
   it('rejects invalid categories, prices, quantities, and sales', async () => {

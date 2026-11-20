@@ -19,6 +19,14 @@ export interface StoreStockItem extends StorePriceGroup {
   categoryName: string;
 }
 
+export interface StockCostSubgroup {
+  /** Opaque representative stock-lot ID; never encodes the purchase cost. */
+  subgroupId: string;
+  remainingUnits: number;
+  /** Null means unknown to an owner or deliberately hidden from staff. */
+  unitCostCents: number | null;
+}
+
 export type StockMovementType = 'venta' | 'entrada' | 'ajuste';
 
 export interface StockMovement {

@@ -7,12 +7,12 @@ import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
 import { FadeIn } from '../../../../ui/components/FadeIn';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
-import { StoreCategory, StoreDashboardSummary, StorePriceGroup, StoreStockItem } from '../../domain/types';
+import { StockCostSubgroup, StoreCategory, StoreDashboardSummary, StorePriceGroup, StoreStockItem } from '../../domain/types';
 import { isLowStock, LOW_STOCK_THRESHOLD } from '../../domain/lowStockAlert';
 import { storeService } from '../../infrastructure/container';
 import { parsePurchaseCost } from '../../domain/stockCost';
 import { parseSalePrice } from '../../domain/salePricing';
-import { formatEuros, InventoryCostDetails, StoreCard, StoreMessage } from '../components/StoreComponents';
+import { formatEuros, InventoryCostDetails, StoreCard, StockCostSubgroupList, StoreMessage } from '../components/StoreComponents';
 import { StoreDashboard } from '../components/StoreDashboard';
 
 const PRICE_PRESETS = [300, 500, 700] as const;
@@ -121,6 +121,10 @@ export function StoreScreen() {
   const [dashboard, setDashboard] = useState<StoreDashboardSummary | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedPriceGroupId, setSelectedPriceGroupId] = useState<number | null>(null);
+  const [costSubgroups, setCostSubgroups] = useState<StockCostSubgroup[]>([]);
+  const [costSubgroupsLoading, setCostSubgroupsLoading] = useState(false);
+  const [costSubgroupsError, setCostSubgroupsError] = useState<string | null>(null);
+  const [costSubgroupsReloadKey, setCostSubgroupsReloadKey] = useState(0);
   const [formCategoryId, setFormCategoryId] = useState<number | null>(null);
   const [priceChoice, setPriceChoice] = useState<PriceChoice>(null);
   const [customPrice, setCustomPrice] = useState('');
@@ -161,7 +165,34 @@ export function StoreScreen() {
 
   useFocusEffect(useCallback(() => {
     void refresh();
-  }, [refresh]));
+    if (view === 'group' && selectedPriceGroupId !== null) {
+      setCostSubgroupsReloadKey((current) => current + 1);
+    }
+  }, [refresh, view, selectedPriceGroupId]));
+
+  useEffect(() => {
+    if (view !== 'group' || selectedPriceGroupId === null) {
+      setCostSubgroups([]);
+      setCostSubgroupsError(null);
+      setCostSubgroupsLoading(false);
+      return;
+    }
+
+    let active = true;
+    setCostSubgroupsLoading(true);
+    setCostSubgroupsError(null);
+    void storeService.listStockCostSubgroups(selectedPriceGroupId)
+      .then((subgroups) => { if (active) setCostSubgroups(subgroups); })
+      .catch((cause) => {
+        if (active) {
+          setCostSubgroups([]);
+          setCostSubgroupsError(getErrorMessage(cause));
+        }
+      })
+      .finally(() => { if (active) setCostSubgroupsLoading(false); });
+
+    return () => { active = false; };
+  }, [view, selectedPriceGroupId, costSubgroupsReloadKey]);
 
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
   const selectedPriceGroup = stockItems.find((item) => item.id === selectedPriceGroupId) ?? null;
@@ -461,6 +492,13 @@ export function StoreScreen() {
             <Text style={[styles.stockNumber, { color: theme.colors.text }]}>{selectedPriceGroup.stockUnits}</Text>
           </View>
           <InventoryCostDetails item={selectedPriceGroup} />
+          <StockCostSubgroupList
+            title="Subgrupos por coste de compra"
+            subgroups={costSubgroups}
+            isOwner
+            loading={costSubgroupsLoading}
+            error={costSubgroupsError}
+          />
           {isLowStock(selectedPriceGroup.stockUnits) ? (
             <LowStockNotice
               item={selectedPriceGroup}
@@ -540,7 +578,7 @@ export function StoreScreen() {
           </View>
 
           {existingFormGroup ? (
-            <StoreMessage message={`Este grupo ya existe: sus unidades se sumarán al stock actual (${existingFormGroup.stockUnits}).`} />
+            <StoreMessage message={`Este grupo ya existe: sus unidades se sumarán al stock actual (${existingFormGroup.stockUnits}). Si cambia el coste de compra, se añadirá un subgrupo distinto.`} />
           ) : null}
 
           <View style={styles.section}>

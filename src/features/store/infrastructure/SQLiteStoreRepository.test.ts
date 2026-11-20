@@ -307,6 +307,21 @@ describe('SQLiteStoreRepository', () => {
     expect(database.prepare('SELECT COUNT(*) AS count FROM store_sales').get()).toMatchObject({ count: 0 });
   });
 
+  it('groups remaining inventory lots into purchase-cost subgroups, keeping zero and unknown costs distinct', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 250 });
+    await repository.receiveStock({ priceGroupId: 1, units: 3, supplierId: null, note: '', unitCostCents: 250 });
+    await repository.receiveStock({ priceGroupId: 1, units: 4, supplierId: null, note: '', unitCostCents: 150 });
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: 0 });
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: null });
+
+    await expect(repository.listStockCostSubgroups(1)).resolves.toEqual([
+      { subgroupId: '1', remainingUnits: 5, unitCostCents: 250 },
+      { subgroupId: '3', remainingUnits: 4, unitCostCents: 150 },
+      { subgroupId: '4', remainingUnits: 1, unitCostCents: 0 },
+      { subgroupId: '5', remainingUnits: 2, unitCostCents: null },
+    ]);
+  });
+
   it('uses exact FIFO costs across batches and reports a loss on the negotiated charged price', async () => {
     await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 400 });
     await repository.receiveStock({ priceGroupId: 1, units: 3, supplierId: null, note: '', unitCostCents: 200 });

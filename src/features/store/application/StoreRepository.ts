@@ -9,6 +9,7 @@ import {
   StoreCategory,
   StorePriceGroup,
   StoreStockItem,
+  StockCostSubgroup,
   StoreDashboardSummary,
   TodaySalesSummary,
 } from '../domain/types';
@@ -16,6 +17,7 @@ import {
 export interface StoreRepository {
   listCategories(): Promise<StoreCategory[]>;
   listStockItems(): Promise<StoreStockItem[]>;
+  listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]>;
   getDashboardSummary(categoryId?: number): Promise<StoreDashboardSummary>;
   createCategory(input: CreateCategoryInput): Promise<StoreCategory>;
   listPriceGroups(categoryId: number): Promise<StorePriceGroup[]>;

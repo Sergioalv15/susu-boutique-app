@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../../../core/backend/supabaseClient';
-import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, StoreCategory, StorePriceGroup, StoreStockItem, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
+import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, StoreCategory, StorePriceGroup, StoreStockItem, StockCostSubgroup, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
 import { StoreRepository } from '../application/StoreRepository';
 import { normalizeSale } from '../domain/salePricing';
 import { nonnegativeTotal } from '../domain/stockCost';
@@ -247,6 +247,25 @@ export class SupabaseStoreRepository implements StoreRepository {
         inventoryCostCents,
       };
     }));
+  }
+
+  async listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]> {
+    const { data, error } = await getSupabaseClient().rpc('list_store_stock_subgroups', {
+      p_price_group_id: priceGroupId,
+    });
+    if (error) throw error;
+
+    return ((data ?? []) as Array<{
+      subgroup_id: string;
+      remaining_units: number | string;
+      unit_cost_cents: number | string | null;
+    }>).map((row) => {
+      const remainingUnits = Number(row.remaining_units);
+      const unitCostCents = numberValue(row.unit_cost_cents);
+      if (!/^\d+$/.test(row.subgroup_id)) throw new Error('El identificador del subgrupo no es válido.');
+      nonnegativeTotal([remainingUnits, unitCostCents ?? 0]);
+      return { subgroupId: row.subgroup_id, remainingUnits, unitCostCents };
+    });
   }
 
   async getDashboardSummary(categoryId?: number): Promise<StoreDashboardSummary> {

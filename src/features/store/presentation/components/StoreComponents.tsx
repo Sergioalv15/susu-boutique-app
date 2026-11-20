@@ -1,7 +1,8 @@
 import { PropsWithChildren } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
-import { StoreStockItem } from '../../domain/types';
+import { StockCostSubgroup, StoreStockItem } from '../../domain/types';
+import { describeStockCostSubgroup } from '../../domain/stockCostSubgroups';
 
 export function formatEuros(cents: number): string {
   return new Intl.NumberFormat('es-ES', {
@@ -71,6 +72,57 @@ export function StoreCard({
     >
       {children}
     </Pressable>
+  );
+}
+
+export function StockCostSubgroupList({
+  subgroups,
+  isOwner,
+  title,
+  loading = false,
+  error = null,
+  selectedSubgroupId,
+  onSelect,
+}: {
+  subgroups: StockCostSubgroup[];
+  isOwner: boolean;
+  title: string;
+  loading?: boolean;
+  error?: string | null;
+  selectedSubgroupId?: string | null;
+  onSelect?: (subgroup: StockCostSubgroup) => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <View style={styles.subgroupList}>
+      <Text style={[styles.subgroupTitle, { color: theme.colors.text }]}>{title}</Text>
+      {loading ? <StoreMessage message="Cargando subgrupos…" /> : null}
+      {error ? <StoreMessage message={error} error /> : null}
+      {!loading && !error && subgroups.length === 0 ? <StoreMessage message="No hay subgrupos con unidades disponibles." /> : null}
+      {!loading && !error ? subgroups.map((subgroup, index) => {
+        const display = describeStockCostSubgroup(subgroup, index, isOwner);
+        const costDescription = display.unitCostCents === undefined
+          ? null
+          : display.unitCostCents === null
+            ? 'Coste de compra desconocido'
+            : `${formatEuros(display.unitCostCents)} por unidad`;
+        const accessibleDescription = [display.label, `${subgroup.remainingUnits} unidades disponibles`, costDescription]
+          .filter(Boolean)
+          .join(', ');
+        return (
+          <StoreCard
+            key={subgroup.subgroupId}
+            onPress={onSelect ? () => onSelect(subgroup) : undefined}
+            selected={selectedSubgroupId === subgroup.subgroupId}
+            accessibilityLabel={accessibleDescription}
+          >
+            <Text style={[styles.subgroupLabel, { color: theme.colors.text }]}>{display.label}</Text>
+            <Text style={[styles.subgroupDetails, { color: theme.colors.mutedText }]}>{subgroup.remainingUnits} unidades disponibles</Text>
+            {costDescription ? <Text style={[styles.subgroupDetails, { color: theme.colors.mutedText }]}>{costDescription}</Text> : null}
+          </StoreCard>
+        );
+      }) : null}
+    </View>
   );
 }
 
@@ -145,6 +197,20 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     justifyContent: 'center',
     gap: 6,
+  },
+  subgroupList: {
+    width: '100%',
+    gap: 8,
+  },
+  subgroupTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  subgroupLabel: {
+    fontWeight: '600',
+  },
+  subgroupDetails: {
+    fontSize: 14,
   },
   pressed: {
     opacity: 0.72,

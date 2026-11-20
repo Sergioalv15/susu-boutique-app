@@ -13,6 +13,7 @@ import {
   StoreCategory,
   StorePriceGroup,
   StoreStockItem,
+  StockCostSubgroup,
   TodaySalesSummary,
 } from '../domain/types';
 import { StoreRepository } from '../application/StoreRepository';
@@ -37,6 +38,12 @@ type PriceGroupRow = {
 type StockItemRow = PriceGroupRow & {
   category_name: string;
   inventory_cost_cents?: number | null;
+};
+
+type StockCostSubgroupRow = {
+  subgroup_id: string;
+  remaining_units: number;
+  unit_cost_cents: number | null;
 };
 
 type StockMovementRow = {
@@ -152,6 +159,25 @@ export class SQLiteStoreRepository implements StoreRepository {
                 price_group.price_cents ASC`,
     ));
     return rows.map(mapStockItem);
+  }
+
+  async listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]> {
+    const rows = await withDatabaseAccess((db) => db.getAllAsync<StockCostSubgroupRow>(
+      `SELECT CAST(MIN(id) AS TEXT) AS subgroup_id,
+              SUM(remaining_units) AS remaining_units,
+              unit_cost_cents
+       FROM store_stock_lots
+       WHERE price_group_id = ? AND remaining_units > 0
+       GROUP BY unit_cost_cents
+       ORDER BY MIN(id) ASC`,
+      [priceGroupId],
+    ));
+    return rows.map((row) => {
+      const remainingUnits = nonnegativeTotal([row.remaining_units]);
+      if (!/^\d+$/.test(row.subgroup_id)) throw new Error('El identificador del subgrupo no es válido.');
+      if (row.unit_cost_cents != null) nonnegativeTotal([row.unit_cost_cents]);
+      return { subgroupId: row.subgroup_id, remainingUnits, unitCostCents: row.unit_cost_cents ?? null };
+    });
   }
 
   async createCategory(input: CreateCategoryInput): Promise<StoreCategory> {

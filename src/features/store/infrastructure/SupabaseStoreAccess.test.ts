@@ -16,6 +16,7 @@ const migrations = [
   '20261114120000_staff_sale_financial_boundary.sql',
   '20261115090000_daily_investment_supabase.sql',
   '20261115100000_owner_manage_business_members.sql',
+  '20261115110000_list_store_stock_subgroups.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -224,6 +225,40 @@ describe('Supabase store RPC role boundaries', () => {
 
     const after = await db.query('select user_id::text, role from public.business_members order by user_id');
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it('returns cost subgroup counts to sellers while hiding euro costs from staff', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 2, 2, 250), ($1::uuid, $2::bigint, 3, 3, 150), ($1::uuid, $2::bigint, 1, 1, null)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 6 where id = $1::bigint', [priceGroupId]);
+
+    const readSubgroups = (userId: string) => asUser(db, userId, async () => {
+      const { rows } = await db.query(
+        `select subgroup_id, remaining_units::integer as remaining_units,
+                unit_cost_cents::integer as unit_cost_cents
+         from public.list_store_stock_subgroups($1::bigint)`,
+        [priceGroupId],
+      );
+      return rows as JsonRecord[];
+    });
+
+    const ownerGroups = await readSubgroups(ownerId);
+    expect(ownerGroups.map((row) => ({ remaining_units: row.remaining_units, unit_cost_cents: row.unit_cost_cents })))
+      .toEqual([
+        { remaining_units: 2, unit_cost_cents: 400 },
+        { remaining_units: 2, unit_cost_cents: 250 },
+        { remaining_units: 3, unit_cost_cents: 150 },
+        { remaining_units: 1, unit_cost_cents: null },
+      ]);
+
+    const staffGroups = await readSubgroups(staffId);
+    expect(staffGroups.map((row) => ({ subgroup_id: row.subgroup_id, remaining_units: row.remaining_units, unit_cost_cents: row.unit_cost_cents })))
+      .toEqual(ownerGroups.map((row) => ({ subgroup_id: row.subgroup_id, remaining_units: row.remaining_units, unit_cost_cents: null })));
+
+    await expect(readSubgroups(outsiderId)).rejects.toMatchObject({ code: '42501' });
   });
 
   it('does not grant authenticated users direct execution of private sale helpers', async () => {

@@ -10,6 +10,7 @@ import {
   StoreCategory,
   StorePriceGroup,
   StoreStockItem,
+  StockCostSubgroup,
   StoreDashboardSummary,
   TodaySalesSummary,
 } from '../domain/types';
@@ -26,6 +27,13 @@ export class StoreService {
 
   listStockItems(): Promise<StoreStockItem[]> {
     return this.repository.listStockItems();
+  }
+
+  listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]> {
+    if (!Number.isSafeInteger(priceGroupId) || priceGroupId <= 0) {
+      throw new RangeError('Elige un grupo de precio válido.');
+    }
+    return this.repository.listStockCostSubgroups(priceGroupId);
   }
 
   getDashboardSummary(categoryId?: number): Promise<StoreDashboardSummary> {
