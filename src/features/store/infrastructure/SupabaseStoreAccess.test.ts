@@ -18,6 +18,8 @@ const migrations = [
   '20261115100000_owner_manage_business_members.sql',
   '20261115110000_list_store_stock_subgroups.sql',
   '20261115120000_sale_cost_subgroups.sql',
+  '20261115130000_owner_stock_catalog_crud.sql',
+  '20261115140000_stock_subgroup_adjustments.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -393,6 +395,86 @@ describe('Supabase store RPC role boundaries', () => {
       .toEqual(ownerGroups.map((row) => ({ subgroup_id: row.subgroup_id, remaining_units: row.remaining_units, unit_cost_cents: null })));
 
     await expect(readSubgroups(outsiderId)).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('removes only selected subgroup units with an adjustment and rolls back overdraw', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 2, 2, 150)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 2 where id = $1::bigint', [priceGroupId]);
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 150',
+      [priceGroupId],
+    ));
+    const subgroupId = rows[0].subgroup_id;
+
+    await asUser(db, ownerId, async () => db.query(
+      'select public.remove_store_stock_subgroup_units($1::bigint, $2::text, $3::integer, $4::text)',
+      [priceGroupId, subgroupId, 1, 'Unidad dañada'],
+    ));
+    const beforeOverdraw = await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id');
+    await expect(asUser(db, ownerId, async () => db.query(
+      'select public.remove_store_stock_subgroup_units($1::bigint, $2::text, $3::integer, $4::text)',
+      [priceGroupId, subgroupId, 2, 'No debe exceder el subgrupo'],
+    ))).rejects.toMatchObject({ code: 'P0001' });
+
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual(beforeOverdraw.rows);
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 3 });
+    expect((await db.query("select units_delta, cost_total_cents, note from public.store_stock_movements where movement_type = 'ajuste'")).rows)
+      .toEqual([{ units_delta: -1, cost_total_cents: 150, note: 'Unidad dañada' }]);
+  });
+
+  it('denies staff subgroup adjustments without changing stock or movements', async () => {
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    const subgroupId = rows[0].subgroup_id;
+    const beforeLots = await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id');
+
+    await expect(asUser(db, staffId, async () => db.query(
+      'select public.remove_store_stock_subgroup_units($1::bigint, $2::text, $3::integer, $4::text)',
+      [priceGroupId, subgroupId, 1, 'Sin permiso'],
+    ))).rejects.toMatchObject({ code: '42501' });
+    await expect(asUser(db, staffId, async () => db.query(
+      'select public.correct_store_stock_subgroup_cost($1::bigint, $2::text, $3::bigint)',
+      [priceGroupId, subgroupId, 250],
+    ))).rejects.toMatchObject({ code: '42501' });
+
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual(beforeLots.rows);
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 2 });
+    expect((await db.query("select count(*)::integer as count from public.store_stock_movements where movement_type = 'ajuste'")).rows[0])
+      .toMatchObject({ count: 0 });
+  });
+
+  it('corrects only remaining units in a cost subgroup with compensating adjustments', async () => {
+    const { rows: subgroupRows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    await asUser(db, ownerId, async () => db.query(
+      'select public.correct_store_stock_subgroup_cost($1::bigint, $2::text, $3::bigint)',
+      [priceGroupId, subgroupRows[0].subgroup_id, 250],
+    ));
+
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 2 });
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots where price_group_id = $1::bigint order by id', [priceGroupId])).rows)
+      .toEqual([
+        { unit_cost_cents: 400, remaining_units: 0 },
+        { unit_cost_cents: 250, remaining_units: 2 },
+      ]);
+    expect((await db.query("select units_delta, cost_total_cents from public.store_stock_movements where movement_type = 'ajuste' order by id")).rows)
+      .toEqual([
+        { units_delta: -2, cost_total_cents: 800 },
+        { units_delta: 2, cost_total_cents: 500 },
+      ]);
   });
 
   it('does not grant authenticated users direct execution of private sale helpers', async () => {
