@@ -8,7 +8,7 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 
 ## Tasks
 - T1 — S1–S2 — Persist exact FIFO lot allocations and add an idempotent, authorized audit reversal that restores those lots, preserves original sales/movements, and excludes reversed sales from net summaries — done (focused PGlite undo/history/security cases and two sale regressions pass) — inline — commit: 85fb4a4.
-- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — in_progress (fix independent-review finding: expired idempotent sale retries must not advertise undo) — inline — commits: bcec354, 0c04246; correction pending.
+- T2 — S1 — Add a temporary, sale-bound “Deshacer” notification action; refresh stock and owner summary after reversal — done (timer 1/1, retry PGlite 2/2, StoreService 5/5, typecheck and web build pass) — inline — commits: bcec354, 0c04246, 317205e.
 - T3 — S1–S2 — Verify exact restoration, authorization, idempotency, history, summary, and concurrency behavior; run suite/typecheck/web build and independent review — blocked (the authorized full-suite attempt timed out and the authorized review found a new S1; any new bounded attempt requires an explicit user request after correction) — independent verifier — commit: pending.
 
 ## Log
@@ -39,3 +39,4 @@ Scope: Provide a temporary undo action for a completed sale while preserving sal
 - L25: Added a public PGlite regression for same-request retries by another seller and after the 30-second window. RED observed: a staff retry of an owner sale still received `undoAvailable: true`.
 - L26: Updated the sale RPC's idempotent path to recompute `undoAvailable` from the original seller, 30-second age, and reversal record, without altering the stored receipt. Focused PGlite GREEN verification is pending; the full-suite and independent-review budgets remain exhausted.
 - L27: Focused retry tests now pass 2/2 for foreign/expired idempotent receipts and exact-lot undo; the timer regression passes 1/1. `SaleScreen` now suppresses stale refresh errors when a newer undo refresh is authoritative. Typecheck passes. No full-suite retry or independent re-review was run.
+- L28: Committed the idempotent-retry eligibility and stale-refresh correction as `317205e` (47 changed lines). Focused PGlite, timer, StoreService, typecheck, web build, and diff checks pass. The only remaining unit is verification; the user's `app.json` change remains unstaged.
