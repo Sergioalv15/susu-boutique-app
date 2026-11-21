@@ -13,6 +13,7 @@ import {
   StoreCategory,
   StorePriceGroup,
   StoreStockItem,
+  StockCostSubgroup,
   TodaySalesSummary,
 } from '../domain/types';
 import { StoreRepository } from '../application/StoreRepository';
@@ -37,6 +38,12 @@ type PriceGroupRow = {
 type StockItemRow = PriceGroupRow & {
   category_name: string;
   inventory_cost_cents?: number | null;
+};
+
+type StockCostSubgroupRow = {
+  subgroup_id: string;
+  remaining_units: number;
+  unit_cost_cents: number | null;
 };
 
 type StockMovementRow = {
@@ -152,6 +159,25 @@ export class SQLiteStoreRepository implements StoreRepository {
                 price_group.price_cents ASC`,
     ));
     return rows.map(mapStockItem);
+  }
+
+  async listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]> {
+    const rows = await withDatabaseAccess((db) => db.getAllAsync<StockCostSubgroupRow>(
+      `SELECT CAST(MIN(id) AS TEXT) AS subgroup_id,
+              SUM(remaining_units) AS remaining_units,
+              unit_cost_cents
+       FROM store_stock_lots
+       WHERE price_group_id = ? AND remaining_units > 0
+       GROUP BY unit_cost_cents
+       ORDER BY MIN(id) ASC`,
+      [priceGroupId],
+    ));
+    return rows.map((row) => {
+      const remainingUnits = nonnegativeTotal([row.remaining_units]);
+      if (!/^\d+$/.test(row.subgroup_id)) throw new Error('El identificador del subgrupo no es válido.');
+      if (row.unit_cost_cents != null) nonnegativeTotal([row.unit_cost_cents]);
+      return { subgroupId: row.subgroup_id, remainingUnits, unitCostCents: row.unit_cost_cents ?? null };
+    });
   }
 
   async createCategory(input: CreateCategoryInput): Promise<StoreCategory> {
@@ -374,12 +400,30 @@ export class SQLiteStoreRepository implements StoreRepository {
           );
           fifoLots.set(groupId, lots);
         }
+        const subgroupCosts = new Map<string, number | null>();
+        for (const item of items) {
+          if (item.sourceSubgroupId === undefined) continue;
+          const sourceLotId = Number(item.sourceSubgroupId);
+          if (!Number.isSafeInteger(sourceLotId) || sourceLotId <= 0) throw new Error('El subgrupo de compra no es válido.');
+          const token = `${item.priceGroupId}:${item.sourceSubgroupId}`;
+          if (subgroupCosts.has(token)) continue;
+          const sourceLot = await db.getFirstAsync<{ unit_cost_cents: number | null }>(
+            'SELECT unit_cost_cents FROM store_stock_lots WHERE id = ? AND price_group_id = ?',
+            [sourceLotId, item.priceGroupId],
+          );
+          if (!sourceLot) throw new Error('El subgrupo de compra ya no está disponible.');
+          subgroupCosts.set(token, sourceLot.unit_cost_cents);
+        }
         const receiptItems: SaleReceiptItem[] = items.map((item) => {
           const group = groups.get(item.priceGroupId)!;
           const unitPriceCents = item.unitPriceCents ?? group.price_cents;
+          const lots = fifoLots.get(item.priceGroupId)!;
+          const costLots = item.sourceSubgroupId === undefined
+            ? lots
+            : lots.filter((lot) => lot.unit_cost_cents === subgroupCosts.get(`${item.priceGroupId}:${item.sourceSubgroupId}`));
           return { priceGroupId: item.priceGroupId, units: item.units, baseUnitPriceCents: group.price_cents,
             unitPriceCents, totalCents: safeTotal([unitPriceCents * item.units]),
-            costTotalCents: consumeFifo(fifoLots.get(item.priceGroupId)!, item.units),
+            costTotalCents: consumeFifo(costLots, item.units),
             remainingUnits: group.stock_units - requested.get(item.priceGroupId)! };
         });
         const totalCents = safeTotal(receiptItems.map((item) => item.totalCents));

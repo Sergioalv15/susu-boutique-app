@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -7,21 +7,33 @@ import { PrimaryButton } from '../../../../ui/components/PrimaryButton';
 import { Screen } from '../../../../ui/components/Screen';
 import { FadeIn } from '../../../../ui/components/FadeIn';
 import { useTheme } from '../../../../core/theme/ThemeProvider';
-import { StoreCategory, StoreDashboardSummary, StorePriceGroup, StoreStockItem } from '../../domain/types';
+import { StockCostSubgroup, StoreCategory, StoreDashboardSummary, StorePriceGroup, StoreStockItem } from '../../domain/types';
 import { isLowStock, LOW_STOCK_THRESHOLD } from '../../domain/lowStockAlert';
-import { storeService } from '../../infrastructure/container';
+import { stockAdministrationService, storeService } from '../../infrastructure/container';
 import { parsePurchaseCost } from '../../domain/stockCost';
 import { parseSalePrice } from '../../domain/salePricing';
-import { formatEuros, InventoryCostDetails, StoreCard, StoreMessage } from '../components/StoreComponents';
+import { formatEuros, InventoryCostDetails, StoreCard, StockCostSubgroupList, StoreMessage } from '../components/StoreComponents';
 import { StoreDashboard } from '../components/StoreDashboard';
+import { CategoryNameForm, PriceGroupForm, SubgroupCostForm, SubgroupRemovalForm } from '../components/StockManagementForms';
 
 const PRICE_PRESETS = [300, 500, 700] as const;
 
 type StoreView = 'stock' | 'category' | 'group' | 'add-stock';
 type PriceChoice = (typeof PRICE_PRESETS)[number] | 'custom' | null;
+type SubgroupOperation = { kind: 'correct-cost' | 'remove-units'; subgroup: StockCostSubgroup } | null;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'No se pudo completar la operación.';
+}
+
+function confirmStockMutation(title: string, message: string): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`));
+  }
+  return new Promise((resolve) => Alert.alert(title, message, [
+    { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+    { text: 'Confirmar', style: 'destructive', onPress: () => resolve(true) },
+  ], { cancelable: true, onDismiss: () => resolve(false) }));
 }
 
 function groupLabel(group: StorePriceGroup): string {
@@ -121,6 +133,10 @@ export function StoreScreen() {
   const [dashboard, setDashboard] = useState<StoreDashboardSummary | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedPriceGroupId, setSelectedPriceGroupId] = useState<number | null>(null);
+  const [costSubgroups, setCostSubgroups] = useState<StockCostSubgroup[]>([]);
+  const [costSubgroupsLoading, setCostSubgroupsLoading] = useState(false);
+  const [costSubgroupsError, setCostSubgroupsError] = useState<string | null>(null);
+  const [costSubgroupsReloadKey, setCostSubgroupsReloadKey] = useState(0);
   const [formCategoryId, setFormCategoryId] = useState<number | null>(null);
   const [priceChoice, setPriceChoice] = useState<PriceChoice>(null);
   const [customPrice, setCustomPrice] = useState('');
@@ -133,9 +149,15 @@ export function StoreScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showTypeForm, setShowTypeForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [editingPriceGroup, setEditingPriceGroup] = useState(false);
+  const [subgroupOperation, setSubgroupOperation] = useState<SubgroupOperation>(null);
 
   useEffect(() => {
     setShowTypeForm(false);
+    setEditingCategory(false);
+    setEditingPriceGroup(false);
+    setSubgroupOperation(null);
   }, [view]);
 
   const refresh = useCallback(async () => {
@@ -161,7 +183,34 @@ export function StoreScreen() {
 
   useFocusEffect(useCallback(() => {
     void refresh();
-  }, [refresh]));
+    if (view === 'group' && selectedPriceGroupId !== null) {
+      setCostSubgroupsReloadKey((current) => current + 1);
+    }
+  }, [refresh, view, selectedPriceGroupId]));
+
+  useEffect(() => {
+    if (view !== 'group' || selectedPriceGroupId === null) {
+      setCostSubgroups([]);
+      setCostSubgroupsError(null);
+      setCostSubgroupsLoading(false);
+      return;
+    }
+
+    let active = true;
+    setCostSubgroupsLoading(true);
+    setCostSubgroupsError(null);
+    void storeService.listStockCostSubgroups(selectedPriceGroupId)
+      .then((subgroups) => { if (active) setCostSubgroups(subgroups); })
+      .catch((cause) => {
+        if (active) {
+          setCostSubgroups([]);
+          setCostSubgroupsError(getErrorMessage(cause));
+        }
+      })
+      .finally(() => { if (active) setCostSubgroupsLoading(false); });
+
+    return () => { active = false; };
+  }, [view, selectedPriceGroupId, costSubgroupsReloadKey]);
 
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
   const selectedPriceGroup = stockItems.find((item) => item.id === selectedPriceGroupId) ?? null;
@@ -180,10 +229,6 @@ export function StoreScreen() {
   const lowStockItems = stockItems
     .filter((item) => isLowStock(item.stockUnits))
     .sort((left, right) => left.stockUnits - right.stockUnits);
-  const categoryItems = selectedCategoryId === null
-    ? []
-    : stockItems.filter((item) => item.categoryId === selectedCategoryId);
-
   const openCategory = (category: StoreCategory) => {
     setSelectedCategoryId(category.id);
     setSelectedPriceGroupId(null);
@@ -323,6 +368,207 @@ export function StoreScreen() {
     void refresh();
   };
 
+  const saveCategoryName = async (name: string) => {
+    if (!selectedCategory || stockLocked.current) return;
+    stockLocked.current = true;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const updated = await stockAdministrationService.updateCategory(selectedCategory.id, name);
+      setEditingCategory(false);
+      setNotice(`Tipo de joya actualizado: ${updated.name}.`);
+      await refresh();
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      stockLocked.current = false;
+      setBusy(false);
+    }
+  };
+
+  const deleteSelectedCategory = async () => {
+    if (!selectedCategory || stockLocked.current) return;
+    const groups = stockItems.filter((item) => item.categoryId === selectedCategory.id);
+    const unitsToRetire = groups.reduce((sum, group) => sum + group.stockUnits, 0);
+    stockLocked.current = true;
+    try {
+      const confirmed = await confirmStockMutation(
+        'Eliminar tipo de joya',
+        `Se archivarán ${groups.length} grupos y se retirarán ${unitsToRetire} unidades restantes mediante ajustes. El historial de ventas y movimientos se conservará.`,
+      );
+      if (!confirmed) return;
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      const result = await stockAdministrationService.deleteCategory(selectedCategory.id);
+      setSelectedCategoryId(null);
+      setSelectedPriceGroupId(null);
+      setView('stock');
+      setNotice(result.status === 'archived'
+        ? `Tipo archivado; ${result.adjustedUnits} unidades retiradas con ajustes.`
+        : 'Tipo de joya eliminado.');
+      await refresh();
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      stockLocked.current = false;
+      setBusy(false);
+    }
+  };
+
+  const savePriceGroupPrice = async (value: string, photoDataUrl: string | null) => {
+    if (!selectedPriceGroup || stockLocked.current) return;
+    const priceCents = parseSalePrice(value);
+    if (priceCents === null) {
+      setError('Introduce un precio de venta mayor que cero, con hasta dos decimales.');
+      return;
+    }
+
+    stockLocked.current = true;
+    try {
+      if (priceCents !== selectedPriceGroup.priceCents) {
+        const confirmed = await confirmStockMutation(
+          'Cambiar precio del grupo',
+          'Se conservará el grupo anterior para el historial. El stock restante y sus subgrupos de coste se trasladarán al nuevo precio.',
+        );
+        if (!confirmed) return;
+      }
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      const result = await stockAdministrationService.updatePriceGroup({
+        priceGroupId: selectedPriceGroup.id,
+        priceCents,
+        sortOrder: selectedPriceGroup.sortOrder,
+        photoDataUrl,
+      });
+      setEditingPriceGroup(false);
+      setSelectedPhotoDataUrl(null);
+      await refresh();
+      setSelectedCategoryId(result.categoryId);
+      setSelectedPriceGroupId(result.id);
+      setCostSubgroupsReloadKey((current) => current + 1);
+      setView('group');
+      setNotice(result.status === 'versioned'
+        ? 'Nuevo grupo creado; el anterior se conserva en el historial y el stock se trasladó.'
+        : 'Grupo actualizado.');
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      stockLocked.current = false;
+      setBusy(false);
+    }
+  };
+
+  const deleteSelectedPriceGroup = async () => {
+    if (!selectedPriceGroup || stockLocked.current) return;
+    stockLocked.current = true;
+    try {
+      const confirmed = await confirmStockMutation(
+        'Eliminar grupo de precio',
+        `Se retirarán ${selectedPriceGroup.stockUnits} unidades restantes mediante ajustes y el grupo se archivará si tiene historial. Las ventas anteriores se conservarán.`,
+      );
+      if (!confirmed) return;
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      const result = await stockAdministrationService.deletePriceGroup(selectedPriceGroup.id);
+      setSelectedPriceGroupId(null);
+      setView('category');
+      setNotice(result.status === 'archived'
+        ? `Grupo archivado; ${result.adjustedUnits} unidades retiradas con ajustes.`
+        : 'Grupo de precio eliminado.');
+      await refresh();
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      stockLocked.current = false;
+      setBusy(false);
+    }
+  };
+
+  const saveSubgroupCost = async (value: string, unknown: boolean) => {
+    if (!selectedPriceGroup || subgroupOperation?.kind !== 'correct-cost' || stockLocked.current) return;
+    const unitCostCents = unknown ? null : parsePurchaseCost(value);
+    if (!unknown && unitCostCents === null) {
+      setError('Introduce un coste válido o elige coste desconocido.');
+      return;
+    }
+    const subgroup = subgroupOperation.subgroup;
+    if (subgroup.unitCostCents === unitCostCents) {
+      setError('El subgrupo ya tiene ese coste.');
+      return;
+    }
+
+    stockLocked.current = true;
+    try {
+      const confirmed = await confirmStockMutation(
+        'Corregir coste del subgrupo',
+        `Se reclasificarán sus ${subgroup.remainingUnits} unidades restantes. Las ventas registradas no cambiarán y se crearán movimientos de ajuste.`,
+      );
+      if (!confirmed) return;
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      const result = await stockAdministrationService.correctSubgroupCost({
+        priceGroupId: selectedPriceGroup.id,
+        subgroupId: subgroup.subgroupId,
+        unitCostCents,
+      });
+      setSubgroupOperation(null);
+      setNotice(`${result.unitsMoved} unidades reclasificadas en un subgrupo de coste ${unitCostCents === null ? 'desconocido' : formatEuros(unitCostCents)}.`);
+      await refresh();
+      setCostSubgroupsReloadKey((current) => current + 1);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      stockLocked.current = false;
+      setBusy(false);
+    }
+  };
+
+  const saveSubgroupRemoval = async (unitsText: string, note: string) => {
+    if (!selectedPriceGroup || subgroupOperation?.kind !== 'remove-units' || stockLocked.current) return;
+    const unitsToRemove = /^\d+$/.test(unitsText.trim()) ? Number(unitsText.trim()) : NaN;
+    const subgroup = subgroupOperation.subgroup;
+    if (!Number.isSafeInteger(unitsToRemove) || unitsToRemove <= 0 || unitsToRemove > subgroup.remainingUnits) {
+      setError('Introduce una cantidad entera que no supere las unidades del subgrupo.');
+      return;
+    }
+    if (!note.trim()) {
+      setError('Escribe el motivo del ajuste.');
+      return;
+    }
+
+    stockLocked.current = true;
+    try {
+      const confirmed = await confirmStockMutation(
+        'Retirar unidades del subgrupo',
+        `Se retirarán ${unitsToRemove} unidades de este subgrupo y quedará un movimiento de ajuste en el historial.`,
+      );
+      if (!confirmed) return;
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      await stockAdministrationService.removeSubgroupUnits({
+        priceGroupId: selectedPriceGroup.id,
+        subgroupId: subgroup.subgroupId,
+        units: unitsToRemove,
+        note,
+      });
+      setSubgroupOperation(null);
+      setNotice(`${unitsToRemove} unidades retiradas con un ajuste.`);
+      await refresh();
+      setCostSubgroupsReloadKey((current) => current + 1);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      stockLocked.current = false;
+      setBusy(false);
+    }
+  };
+
   const goBack = () => {
     setError(null);
     if (view === 'add-stock') {
@@ -394,11 +640,7 @@ export function StoreScreen() {
                   return (
                     <StoreCard
                       key={category.id}
-                      onPress={() => {
-                        setSelectedCategoryId(category.id);
-                        setSelectedPriceGroupId(null);
-                        setView('category');
-                      }}
+                      onPress={() => openCategory(category)}
                       accessibilityLabel={`Ver stock de ${category.name}`}
                     >
                       <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>{category.name}</Text>
@@ -448,6 +690,21 @@ export function StoreScreen() {
               ))}
             </View>
           )}
+          {selectedCategory ? <View style={styles.managementActions}>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => setEditingCategory(true)} style={styles.managementAction}>
+              <Text style={{ color: theme.colors.primary }}>Editar tipo</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => void deleteSelectedCategory()} style={styles.managementAction}>
+              <Text style={{ color: theme.colors.danger }}>Eliminar tipo</Text>
+            </Pressable>
+          </View> : null}
+          {editingCategory && selectedCategory ? <CategoryNameForm
+            key={`category-${selectedCategory.id}`}
+            initialName={selectedCategory.name}
+            busy={busy}
+            onSave={(name) => void saveCategoryName(name)}
+            onCancel={() => setEditingCategory(false)}
+          /> : null}
           <PrimaryButton title="Agregar stock" onPress={() => openAddStock(selectedCategoryId ?? undefined)} />
         </View>
       ) : null}
@@ -461,6 +718,53 @@ export function StoreScreen() {
             <Text style={[styles.stockNumber, { color: theme.colors.text }]}>{selectedPriceGroup.stockUnits}</Text>
           </View>
           <InventoryCostDetails item={selectedPriceGroup} />
+          <StockCostSubgroupList
+            title="Subgrupos por coste de compra"
+            subgroups={costSubgroups}
+            isOwner
+            loading={costSubgroupsLoading}
+            error={costSubgroupsError}
+            onCorrectCost={(subgroup) => {
+              setError(null);
+              setSubgroupOperation({ kind: 'correct-cost', subgroup });
+            }}
+            onRemoveUnits={(subgroup) => {
+              setError(null);
+              setSubgroupOperation({ kind: 'remove-units', subgroup });
+            }}
+          />
+          {subgroupOperation?.kind === 'correct-cost' ? <SubgroupCostForm
+            key={`cost-${subgroupOperation.subgroup.subgroupId}`}
+            subgroup={subgroupOperation.subgroup}
+            busy={busy}
+            onSave={(value, unknown) => void saveSubgroupCost(value, unknown)}
+            onCancel={() => setSubgroupOperation(null)}
+          /> : null}
+          {subgroupOperation?.kind === 'remove-units' ? <SubgroupRemovalForm
+            key={`remove-${subgroupOperation.subgroup.subgroupId}`}
+            subgroup={subgroupOperation.subgroup}
+            busy={busy}
+            onSave={(quantity, note) => void saveSubgroupRemoval(quantity, note)}
+            onCancel={() => setSubgroupOperation(null)}
+          /> : null}
+          <View style={styles.managementActions}>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { setSelectedPhotoDataUrl(null); setEditingPriceGroup(true); }} style={styles.managementAction}>
+              <Text style={[styles.managementActionText, { color: theme.colors.primary }]}>Editar precio</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => void deleteSelectedPriceGroup()} style={styles.managementAction}>
+              <Text style={[styles.managementActionText, { color: theme.colors.danger }]}>Eliminar grupo</Text>
+            </Pressable>
+          </View>
+          {editingPriceGroup ? <PriceGroupForm
+            key={`price-${selectedPriceGroup.id}`}
+            priceCents={selectedPriceGroup.priceCents}
+            currentPhotoDataUrl={selectedPriceGroup.photoDataUrl}
+            selectedPhotoDataUrl={selectedPhotoDataUrl}
+            busy={busy}
+            onPickPhoto={() => void pickExamplePhoto()}
+            onSave={(value, photoDataUrl) => void savePriceGroupPrice(value, photoDataUrl)}
+            onCancel={() => { setEditingPriceGroup(false); setSelectedPhotoDataUrl(null); }}
+          /> : null}
           {isLowStock(selectedPriceGroup.stockUnits) ? (
             <LowStockNotice
               item={selectedPriceGroup}
@@ -540,7 +844,7 @@ export function StoreScreen() {
           </View>
 
           {existingFormGroup ? (
-            <StoreMessage message={`Este grupo ya existe: sus unidades se sumarán al stock actual (${existingFormGroup.stockUnits}).`} />
+            <StoreMessage message={`Este grupo ya existe: sus unidades se sumarán al stock actual (${existingFormGroup.stockUnits}). Si cambia el coste de compra, se añadirá un subgrupo distinto.`} />
           ) : null}
 
           <View style={styles.section}>
@@ -646,6 +950,24 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 10,
+  },
+  managementActions: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  managementAction: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: '#D8CEC2',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+  managementActionText: {
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 19,

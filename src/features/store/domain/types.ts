@@ -19,6 +19,14 @@ export interface StoreStockItem extends StorePriceGroup {
   categoryName: string;
 }
 
+export interface StockCostSubgroup {
+  /** Opaque representative stock-lot ID; never encodes the purchase cost. */
+  subgroupId: string;
+  remainingUnits: number;
+  /** Null means unknown to an owner or deliberately hidden from staff. */
+  unitCostCents: number | null;
+}
+
 export type StockMovementType = 'venta' | 'entrada' | 'ajuste';
 
 export interface StockMovement {
@@ -57,6 +65,13 @@ export interface SaleReceipt {
   items?: SaleReceiptItem[];
   costTotalCents?: number | null;
   profitCents?: number | null;
+  undoAvailable?: boolean;
+}
+
+export interface SaleUndoResult {
+  saleId: number;
+  status: 'undone';
+  unitsRestored: number;
 }
 
 export interface SaleReceiptItem {
@@ -98,6 +113,8 @@ export interface AddStoreStockInput {
 export interface SaleLineInput {
   priceGroupId: number;
   units: number;
+  /** Omit to preserve legacy FIFO consumption across the whole price group. */
+  sourceSubgroupId?: string;
   /** Omit to charge the catalog price. A supplied price is agreed per unit. */
   unitPriceCents?: number;
 }

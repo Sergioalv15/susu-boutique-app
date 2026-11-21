@@ -6,10 +6,12 @@ import {
   CreatePriceGroupInput,
   ReceiveStockInput,
   SaleReceipt,
+  SaleUndoResult,
   StockMovement,
   StoreCategory,
   StorePriceGroup,
   StoreStockItem,
+  StockCostSubgroup,
   StoreDashboardSummary,
   TodaySalesSummary,
 } from '../domain/types';
@@ -26,6 +28,13 @@ export class StoreService {
 
   listStockItems(): Promise<StoreStockItem[]> {
     return this.repository.listStockItems();
+  }
+
+  listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]> {
+    if (!Number.isSafeInteger(priceGroupId) || priceGroupId <= 0) {
+      throw new RangeError('Elige un grupo de precio válido.');
+    }
+    return this.repository.listStockCostSubgroups(priceGroupId);
   }
 
   getDashboardSummary(categoryId?: number): Promise<StoreDashboardSummary> {
@@ -87,6 +96,16 @@ export class StoreService {
   completeSale(input: CompleteSaleInput): Promise<SaleReceipt> {
     normalizeSale(input);
     return this.repository.completeSale(input);
+  }
+
+  undoSale(saleId: number): Promise<SaleUndoResult> {
+    if (!Number.isSafeInteger(saleId) || saleId <= 0) {
+      throw new RangeError('El identificador de venta no es válido.');
+    }
+    if (!this.repository.undoSale) {
+      throw new Error('Deshacer ventas no está disponible en este almacenamiento.');
+    }
+    return this.repository.undoSale(saleId);
   }
 
   getTodaySummary(now = new Date()): Promise<TodaySalesSummary> {

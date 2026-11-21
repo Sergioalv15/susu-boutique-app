@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../../../core/backend/supabaseClient';
-import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, StoreCategory, StorePriceGroup, StoreStockItem, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
+import { CompleteSaleInput, SaleReceipt, SaleReceiptItem, SaleUndoResult, StoreCategory, StorePriceGroup, StoreStockItem, StockCostSubgroup, StockMovement, TodaySalesSummary, StoreDashboardSummary, CreateCategoryInput, CreatePriceGroupInput, AddStoreStockInput, ReceiveStockInput } from '../domain/types';
 import { StoreRepository } from '../application/StoreRepository';
 import { normalizeSale } from '../domain/salePricing';
 import { nonnegativeTotal } from '../domain/stockCost';
@@ -63,6 +63,7 @@ type RpcSaleReceipt = {
   remainingUnits: number;
   costTotalCents?: number | string | null;
   profitCents?: number | string | null;
+  undoAvailable?: boolean;
   items: Array<{
     priceGroupId: number | string;
     units: number;
@@ -72,6 +73,12 @@ type RpcSaleReceipt = {
     remainingUnits: number;
     costTotalCents?: number | string | null;
   }>;
+};
+
+type RpcSaleUndoResult = {
+  saleId: number | string;
+  status: string;
+  unitsRestored: number | string;
 };
 
 function numberValue(value: number | string | null): number | null {
@@ -112,8 +119,19 @@ function mapSaleReceipt(row: RpcSaleReceipt): SaleReceipt {
     remainingUnits: row.remainingUnits,
     ...(row.costTotalCents !== undefined ? { costTotalCents: numberValue(row.costTotalCents) } : {}),
     ...(row.profitCents !== undefined ? { profitCents: numberValue(row.profitCents) } : {}),
+    undoAvailable: row.undoAvailable === true,
     items,
   };
+}
+
+function mapSaleUndoResult(row: RpcSaleUndoResult): SaleUndoResult {
+  const saleId = Number(row.saleId);
+  const unitsRestored = Number(row.unitsRestored);
+  if (row.status !== 'undone' || !Number.isSafeInteger(saleId) || saleId <= 0
+    || !Number.isSafeInteger(unitsRestored) || unitsRestored <= 0) {
+    throw new Error('La respuesta de deshacer la venta no es válida.');
+  }
+  return { saleId, status: 'undone', unitsRestored };
 }
 
 function decodeBase64(value: string): Uint8Array {
@@ -147,7 +165,7 @@ function parseImageDataUrl(dataUrl: string): { contentType: string; extension: s
   return { contentType, extension, bytes: decodeBase64(match[2]) };
 }
 
-async function getCurrentBusinessId(): Promise<string> {
+export async function getCurrentBusinessId(): Promise<string> {
   const client = getSupabaseClient();
   const { data: userResult, error: userError } = await client.auth.getUser();
   if (userError) throw userError;
@@ -162,7 +180,7 @@ async function getCurrentBusinessId(): Promise<string> {
   return data.business_id;
 }
 
-async function uploadProductImage(dataUrl: string, businessId: string): Promise<string> {
+export async function uploadProductImage(dataUrl: string, businessId: string): Promise<string> {
   const image = parseImageDataUrl(dataUrl);
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${image.extension}`;
   const path = `${businessId}/${uniqueName}`;
@@ -176,7 +194,7 @@ async function uploadProductImage(dataUrl: string, businessId: string): Promise<
   return path;
 }
 
-async function removeProductImage(path: string): Promise<void> {
+export async function removeProductImage(path: string): Promise<void> {
   await getSupabaseClient().storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
 }
 
@@ -247,6 +265,25 @@ export class SupabaseStoreRepository implements StoreRepository {
         inventoryCostCents,
       };
     }));
+  }
+
+  async listStockCostSubgroups(priceGroupId: number): Promise<StockCostSubgroup[]> {
+    const { data, error } = await getSupabaseClient().rpc('list_store_stock_subgroups', {
+      p_price_group_id: priceGroupId,
+    });
+    if (error) throw error;
+
+    return ((data ?? []) as Array<{
+      subgroup_id: string;
+      remaining_units: number | string;
+      unit_cost_cents: number | string | null;
+    }>).map((row) => {
+      const remainingUnits = Number(row.remaining_units);
+      const unitCostCents = numberValue(row.unit_cost_cents);
+      if (!/^\d+$/.test(row.subgroup_id)) throw new Error('El identificador del subgrupo no es válido.');
+      nonnegativeTotal([remainingUnits, unitCostCents ?? 0]);
+      return { subgroupId: row.subgroup_id, remainingUnits, unitCostCents };
+    });
   }
 
   async getDashboardSummary(categoryId?: number): Promise<StoreDashboardSummary> {
@@ -337,6 +374,12 @@ export class SupabaseStoreRepository implements StoreRepository {
     });
     if (error) throw error;
     return mapSaleReceipt(data as RpcSaleReceipt);
+  }
+
+  async undoSale(saleId: number): Promise<SaleUndoResult> {
+    const { data, error } = await getSupabaseClient().rpc('undo_store_sale', { p_sale_id: saleId });
+    if (error) throw error;
+    return mapSaleUndoResult(data as RpcSaleUndoResult);
   }
 
   async getTodaySummary(date: string): Promise<TodaySalesSummary> {

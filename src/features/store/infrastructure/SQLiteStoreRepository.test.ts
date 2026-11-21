@@ -307,6 +307,71 @@ describe('SQLiteStoreRepository', () => {
     expect(database.prepare('SELECT COUNT(*) AS count FROM store_sales').get()).toMatchObject({ count: 0 });
   });
 
+  it('groups remaining inventory lots into purchase-cost subgroups, keeping zero and unknown costs distinct', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 250 });
+    await repository.receiveStock({ priceGroupId: 1, units: 3, supplierId: null, note: '', unitCostCents: 250 });
+    await repository.receiveStock({ priceGroupId: 1, units: 4, supplierId: null, note: '', unitCostCents: 150 });
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: 0 });
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: null });
+
+    await expect(repository.listStockCostSubgroups(1)).resolves.toEqual([
+      { subgroupId: '1', remainingUnits: 5, unitCostCents: 250 },
+      { subgroupId: '3', remainingUnits: 4, unitCostCents: 150 },
+      { subgroupId: '4', remainingUnits: 1, unitCostCents: 0 },
+      { subgroupId: '5', remainingUnits: 2, unitCostCents: null },
+    ]);
+  });
+
+  it('sells from the selected cost subgroup and keeps FIFO within that subgroup', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 400 });
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: 250 });
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 250 });
+    await repository.receiveStock({ priceGroupId: 1, units: 3, supplierId: null, note: '', unitCostCents: 150 });
+    const subgroup = (await repository.listStockCostSubgroups(1)).find((item) => item.unitCostCents === 250)!;
+    const sale = { requestId: 'selected-subgroup-1', items: [{ priceGroupId: 1, units: 2, sourceSubgroupId: subgroup.subgroupId }] };
+
+    const receipt = await repository.completeSale(sale);
+    expect(receipt).toMatchObject({ costTotalCents: 500, profitCents: 100 });
+    expect(await repository.completeSale(sale)).toEqual(receipt);
+    expect(database.prepare('SELECT unit_cost_cents, remaining_units FROM store_stock_lots ORDER BY id').all())
+      .toEqual([
+        { unit_cost_cents: 400, remaining_units: 2 },
+        { unit_cost_cents: 250, remaining_units: 0 },
+        { unit_cost_cents: 250, remaining_units: 1 },
+        { unit_cost_cents: 150, remaining_units: 3 },
+      ]);
+  });
+
+  it('selects explicit free-cost and unknown-cost subgroups independently', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: 0 });
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: null });
+    const subgroups = await repository.listStockCostSubgroups(1);
+    const free = subgroups.find((item) => item.unitCostCents === 0)!;
+    const unknown = subgroups.find((item) => item.unitCostCents === null)!;
+
+    await expect(repository.completeSale({ priceGroupId: 1, units: 1, sourceSubgroupId: free.subgroupId }))
+      .resolves.toMatchObject({ costTotalCents: 0, profitCents: 300 });
+    await expect(repository.completeSale({ priceGroupId: 1, units: 1, sourceSubgroupId: unknown.subgroupId }))
+      .resolves.toMatchObject({ costTotalCents: null, profitCents: null });
+    expect((await repository.listStockCostSubgroups(1))).toEqual([]);
+  });
+
+  it('rejects a sale larger than its selected subgroup and leaves all data unchanged', async () => {
+    await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 400 });
+    await repository.receiveStock({ priceGroupId: 1, units: 1, supplierId: null, note: '', unitCostCents: 200 });
+    const subgroup = (await repository.listStockCostSubgroups(1)).find((item) => item.unitCostCents === 200)!;
+    const beforeLots = database.prepare('SELECT unit_cost_cents, remaining_units FROM store_stock_lots ORDER BY id').all();
+
+    await expect(repository.completeSale({
+      requestId: 'subgroup-overdraw-1',
+      items: [{ priceGroupId: 1, units: 2, sourceSubgroupId: subgroup.subgroupId }],
+    })).rejects.toThrow();
+
+    expect(database.prepare('SELECT unit_cost_cents, remaining_units FROM store_stock_lots ORDER BY id').all()).toEqual(beforeLots);
+    expect(database.prepare('SELECT COUNT(*) AS count FROM store_sales').get()).toMatchObject({ count: 0 });
+    expect((await repository.listPriceGroups(1))[0].stockUnits).toBe(3);
+  });
+
   it('uses exact FIFO costs across batches and reports a loss on the negotiated charged price', async () => {
     await repository.receiveStock({ priceGroupId: 1, units: 2, supplierId: null, note: '', unitCostCents: 400 });
     await repository.receiveStock({ priceGroupId: 1, units: 3, supplierId: null, note: '', unitCostCents: 200 });

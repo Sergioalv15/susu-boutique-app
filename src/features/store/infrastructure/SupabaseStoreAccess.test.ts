@@ -16,6 +16,11 @@ const migrations = [
   '20261114120000_staff_sale_financial_boundary.sql',
   '20261115090000_daily_investment_supabase.sql',
   '20261115100000_owner_manage_business_members.sql',
+  '20261115110000_list_store_stock_subgroups.sql',
+  '20261115120000_sale_cost_subgroups.sql',
+  '20261115130000_owner_stock_catalog_crud.sql',
+  '20261115140000_stock_subgroup_adjustments.sql',
+  '20261120100000_sale_undo.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -35,13 +40,24 @@ async function asUser<T>(db: PGlite, userId: string, action: () => Promise<T>): 
   }
 }
 
-async function callSale(db: PGlite, userId: string, requestId: string, priceGroupId: number): Promise<JsonRecord> {
+async function callSaleItems(db: PGlite, userId: string, requestId: string, items: JsonRecord[]): Promise<JsonRecord> {
   return asUser(db, userId, async () => {
     const { rows } = await db.query(
       'select public.complete_store_sale($1::jsonb, $2::text) as receipt',
-      [JSON.stringify([{ priceGroupId, units: 1 }]), requestId],
+      [JSON.stringify(items), requestId],
     );
     return columnValue(rows[0], 'receipt') as JsonRecord;
+  });
+}
+
+async function callSale(db: PGlite, userId: string, requestId: string, priceGroupId: number): Promise<JsonRecord> {
+  return callSaleItems(db, userId, requestId, [{ priceGroupId, units: 1 }]);
+}
+
+async function callUndo(db: PGlite, userId: string, saleId: number): Promise<JsonRecord> {
+  return asUser(db, userId, async () => {
+    const { rows } = await db.query('select public.undo_store_sale($1::bigint) as result', [saleId]);
+    return columnValue(rows[0], 'result') as JsonRecord;
   });
 }
 
@@ -168,6 +184,135 @@ describe('Supabase store RPC role boundaries', () => {
     expect((ownerRetry.items as JsonRecord[])[0]).toHaveProperty('costTotalCents', 400);
   });
 
+  it('consumes the selected subgroup for staff without disclosing its cost, including on owner retry', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 2, 2, 150), ($1::uuid, $2::bigint, 2, 2, 150)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 4 where id = $1::bigint', [priceGroupId]);
+
+    const { rows: subgroupRows } = await asUser(db, staffId, async () => db.query<{ subgroup_id: string; remaining_units: number }>(
+      'select subgroup_id, remaining_units::integer from public.list_store_stock_subgroups($1::bigint)',
+      [priceGroupId],
+    ));
+    const selected = subgroupRows.find((row) => row.remaining_units === 4);
+    expect(selected).toBeDefined();
+
+    const requestId = 'selected-cost-sale-1';
+    const items = [{ priceGroupId, units: 3, sourceSubgroupId: String(selected!.subgroup_id) }];
+    const staffReceipt = await callSaleItems(db, staffId, requestId, items);
+    expect(staffReceipt).toMatchObject({ unitsSold: 3, totalCents: 3000 });
+    expect(staffReceipt).not.toHaveProperty('costTotalCents');
+    expect((staffReceipt.items as JsonRecord[])[0]).not.toHaveProperty('costTotalCents');
+
+    const ownerRetry = await callSaleItems(db, ownerId, requestId, items);
+    expect(ownerRetry).toMatchObject({ costTotalCents: 450, profitCents: 2550 });
+    expect((ownerRetry.items as JsonRecord[])[0]).toHaveProperty('costTotalCents', 450);
+
+    const { rows: remainingLots } = await db.query(
+      'select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id',
+    );
+    expect(remainingLots).toEqual([
+      { unit_cost_cents: 400, remaining_units: 2 },
+      { unit_cost_cents: 150, remaining_units: 0 },
+      { unit_cost_cents: 150, remaining_units: 1 },
+    ]);
+  });
+
+  it('keeps selected free-cost and unknown-cost subgroups distinct', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 1, 1, 0), ($1::uuid, $2::bigint, 1, 1, null)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 2 where id = $1::bigint', [priceGroupId]);
+
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string; unit_cost_cents: number | null }>(
+      `select subgroup_id, unit_cost_cents::integer as unit_cost_cents
+       from public.list_store_stock_subgroups($1::bigint)`,
+      [priceGroupId],
+    ));
+    const free = rows.find((row) => row.unit_cost_cents === 0);
+    const unknown = rows.find((row) => row.unit_cost_cents === null);
+    expect(free).toBeDefined();
+    expect(unknown).toBeDefined();
+
+    await expect(callSaleItems(db, ownerId, 'free-subgroup-001', [
+      { priceGroupId, units: 1, sourceSubgroupId: String(free!.subgroup_id) },
+    ])).resolves.toMatchObject({ costTotalCents: 0, profitCents: 1000 });
+    await expect(callSaleItems(db, ownerId, 'unknown-subgroup-001', [
+      { priceGroupId, units: 1, sourceSubgroupId: String(unknown!.subgroup_id) },
+    ])).resolves.toMatchObject({ costTotalCents: null, profitCents: null });
+  });
+
+  it('rolls back earlier subgroup consumption if a later subgroup token is invalid', async () => {
+    await expect(callSaleItems(db, ownerId, 'invalid-subgroup-1', [
+      { priceGroupId, units: 1, sourceSubgroupId: '1' },
+      { priceGroupId, units: 1, sourceSubgroupId: '999999' },
+    ])).rejects.toMatchObject({ code: 'P0001' });
+
+    expect((await db.query('select remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual([{ remaining_units: 2 }]);
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 2 });
+    expect((await db.query('select count(*)::integer as count from public.store_sales')).rows[0]).toMatchObject({ count: 0 });
+  });
+
+  it('rejects subgroup overdraw without changing stock, lots, or sales', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 1, 1, 150)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 1 where id = $1::bigint', [priceGroupId]);
+
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 150',
+      [priceGroupId],
+    ));
+    const selectedSubgroupId = String(rows[0].subgroup_id);
+    const beforeLots = await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id');
+
+    await expect(callSaleItems(db, ownerId, 'subgroup-overdraw-1', [
+      { priceGroupId, units: 2, sourceSubgroupId: selectedSubgroupId },
+    ])).rejects.toMatchObject({ code: 'P0001' });
+
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual(beforeLots.rows);
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 3 });
+    expect((await db.query('select count(*)::integer as count from public.store_sales')).rows[0]).toMatchObject({ count: 0 });
+  });
+
+  it('rejects a subgroup token from another price group without any sale or stock writes', async () => {
+    const { rows: groupRows } = await db.query<{ id: string }>(
+      `insert into public.store_price_groups (business_id, category_id, price_cents, stock_units, sort_order, photo_path)
+       select business_id, category_id, 1500, 1, 1, ''
+       from public.store_price_groups where id = $1::bigint returning id::text as id`,
+      [priceGroupId],
+    );
+    const otherGroupId = Number(groupRows[0].id);
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 1, 1, 150)`,
+      [businessId, otherGroupId],
+    );
+    const { rows: subgroupRows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint)',
+      [otherGroupId],
+    ));
+    const beforeLots = await db.query('select price_group_id, remaining_units from public.store_stock_lots order by id');
+
+    await expect(callSaleItems(db, ownerId, 'foreign-subgroup-1', [
+      { priceGroupId, units: 1, sourceSubgroupId: subgroupRows[0].subgroup_id },
+    ])).rejects.toMatchObject({ code: 'P0001' });
+
+    expect((await db.query('select price_group_id, remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual(beforeLots.rows);
+    expect((await db.query('select count(*)::integer as count from public.store_sales')).rows[0]).toMatchObject({ count: 0 });
+  });
+
   it('filters purchase-cost lots from staff-facing stock reads while retaining owner access', async () => {
     const readCosts = (userId: string) => asUser(db, userId, async () => {
       const { rows } = await db.query(
@@ -224,6 +369,277 @@ describe('Supabase store RPC role boundaries', () => {
 
     const after = await db.query('select user_id::text, role from public.business_members order by user_id');
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it('returns cost subgroup counts to sellers while hiding euro costs from staff', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 2, 2, 250), ($1::uuid, $2::bigint, 3, 3, 150), ($1::uuid, $2::bigint, 1, 1, null)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 6 where id = $1::bigint', [priceGroupId]);
+
+    const readSubgroups = (userId: string) => asUser(db, userId, async () => {
+      const { rows } = await db.query(
+        `select subgroup_id, remaining_units::integer as remaining_units,
+                unit_cost_cents::integer as unit_cost_cents
+         from public.list_store_stock_subgroups($1::bigint)`,
+        [priceGroupId],
+      );
+      return rows as JsonRecord[];
+    });
+
+    const ownerGroups = await readSubgroups(ownerId);
+    expect(ownerGroups.map((row) => ({ remaining_units: row.remaining_units, unit_cost_cents: row.unit_cost_cents })))
+      .toEqual([
+        { remaining_units: 2, unit_cost_cents: 400 },
+        { remaining_units: 2, unit_cost_cents: 250 },
+        { remaining_units: 3, unit_cost_cents: 150 },
+        { remaining_units: 1, unit_cost_cents: null },
+      ]);
+
+    const staffGroups = await readSubgroups(staffId);
+    expect(staffGroups.map((row) => ({ subgroup_id: row.subgroup_id, remaining_units: row.remaining_units, unit_cost_cents: row.unit_cost_cents })))
+      .toEqual(ownerGroups.map((row) => ({ subgroup_id: row.subgroup_id, remaining_units: row.remaining_units, unit_cost_cents: null })));
+
+    await expect(readSubgroups(outsiderId)).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('removes only selected subgroup units with an adjustment and rolls back overdraw', async () => {
+    await db.query(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 2, 2, 150)`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 2 where id = $1::bigint', [priceGroupId]);
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 150',
+      [priceGroupId],
+    ));
+    const subgroupId = rows[0].subgroup_id;
+
+    await asUser(db, ownerId, async () => db.query(
+      'select public.remove_store_stock_subgroup_units($1::bigint, $2::text, $3::integer, $4::text)',
+      [priceGroupId, subgroupId, 1, 'Unidad dañada'],
+    ));
+    const beforeOverdraw = await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id');
+    await expect(asUser(db, ownerId, async () => db.query(
+      'select public.remove_store_stock_subgroup_units($1::bigint, $2::text, $3::integer, $4::text)',
+      [priceGroupId, subgroupId, 2, 'No debe exceder el subgrupo'],
+    ))).rejects.toMatchObject({ code: 'P0001' });
+
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual(beforeOverdraw.rows);
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 3 });
+    expect((await db.query("select units_delta, cost_total_cents, note from public.store_stock_movements where movement_type = 'ajuste'")).rows)
+      .toEqual([{ units_delta: -1, cost_total_cents: 150, note: 'Unidad dañada' }]);
+  });
+
+  it('denies staff subgroup adjustments without changing stock or movements', async () => {
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    const subgroupId = rows[0].subgroup_id;
+    const beforeLots = await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id');
+
+    await expect(asUser(db, staffId, async () => db.query(
+      'select public.remove_store_stock_subgroup_units($1::bigint, $2::text, $3::integer, $4::text)',
+      [priceGroupId, subgroupId, 1, 'Sin permiso'],
+    ))).rejects.toMatchObject({ code: '42501' });
+    await expect(asUser(db, staffId, async () => db.query(
+      'select public.correct_store_stock_subgroup_cost($1::bigint, $2::text, $3::bigint)',
+      [priceGroupId, subgroupId, 250],
+    ))).rejects.toMatchObject({ code: '42501' });
+
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots order by id')).rows)
+      .toEqual(beforeLots.rows);
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 2 });
+    expect((await db.query("select count(*)::integer as count from public.store_stock_movements where movement_type = 'ajuste'")).rows[0])
+      .toMatchObject({ count: 0 });
+  });
+
+  it('corrects only remaining units in a cost subgroup with compensating adjustments', async () => {
+    const { rows: subgroupRows } = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    await asUser(db, ownerId, async () => db.query(
+      'select public.correct_store_stock_subgroup_cost($1::bigint, $2::text, $3::bigint)',
+      [priceGroupId, subgroupRows[0].subgroup_id, 250],
+    ));
+
+    expect((await db.query('select stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
+      .toMatchObject({ stock_units: 2 });
+    expect((await db.query('select unit_cost_cents::integer as unit_cost_cents, remaining_units from public.store_stock_lots where price_group_id = $1::bigint order by id', [priceGroupId])).rows)
+      .toEqual([
+        { unit_cost_cents: 400, remaining_units: 0 },
+        { unit_cost_cents: 250, remaining_units: 2 },
+      ]);
+    expect((await db.query("select units_delta, cost_total_cents from public.store_stock_movements where movement_type = 'ajuste' order by id")).rows)
+      .toEqual([
+        { units_delta: -2, cost_total_cents: 800 },
+        { units_delta: 2, cost_total_cents: 500 },
+      ]);
+  });
+
+  it('restores the exact FIFO subgroup lots, preserves the sale, and excludes it from net summaries', async () => {
+    const subgroup = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string }>(
+      'select subgroup_id from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    const originalSubgroupId = subgroup.rows[0].subgroup_id;
+    const secondLot = await db.query<{ id: number }>(
+      `insert into public.store_stock_lots (business_id, price_group_id, received_units, remaining_units, unit_cost_cents)
+       values ($1::uuid, $2::bigint, 3, 3, 400) returning id`,
+      [businessId, priceGroupId],
+    );
+    await db.query('update public.store_price_groups set stock_units = stock_units + 3 where id = $1::bigint', [priceGroupId]);
+
+    const requestId = 'undo-fifo-sale-1';
+    const items = [{ priceGroupId, units: 3, sourceSubgroupId: originalSubgroupId }];
+    const sale = await callSaleItems(db, ownerId, requestId, items);
+    expect(sale).toHaveProperty('undoAvailable', true);
+    const saleId = Number(sale.saleId);
+    await expect(callTodaySummary(db, ownerId)).resolves.toMatchObject({ totalCents: 3000, unitsSold: 3, costTotalCents: 1200 });
+
+    const firstUndo = await callUndo(db, ownerId, saleId);
+    expect(firstUndo).toMatchObject({ saleId, status: 'undone', unitsRestored: 3 });
+    const movementHistory = await asUser(db, ownerId, async () => db.query<{ movement_type: string; units_delta: number; sale_id: number; cost_total_cents: number | null; note: string }>(
+      'select movement_type, units_delta, sale_id, cost_total_cents, note from public.store_stock_movements where sale_id = $1::bigint order by id',
+      [saleId],
+    ));
+    expect(movementHistory.rows).toEqual([
+      { movement_type: 'venta', units_delta: -3, sale_id: saleId, cost_total_cents: 1200, note: '' },
+      { movement_type: 'ajuste', units_delta: 2, sale_id: saleId, cost_total_cents: 800, note: `Deshacer venta ${saleId}: reposición del lote FIFO ${originalSubgroupId}.` },
+      { movement_type: 'ajuste', units_delta: 1, sale_id: saleId, cost_total_cents: 400, note: `Deshacer venta ${saleId}: reposición del lote FIFO ${secondLot.rows[0].id}.` },
+    ]);
+    await expect(callTodaySummary(db, ownerId)).resolves.toMatchObject({ totalCents: 0, unitsSold: 0, costTotalCents: 0, profitCents: 0 });
+    const { rows: dashboardRows } = await asUser(db, ownerId, async () => db.query(
+      'select public.get_store_dashboard_summary(null::bigint) as result',
+    ));
+    expect(columnValue(dashboardRows[0], 'result')).toMatchObject({ unitsSold: 0, revenueCents: 0, soldCostCents: 0 });
+
+    const restored = await asUser(db, ownerId, async () => db.query<{ subgroup_id: string; remaining_units: number; unit_cost_cents: number }>(
+      `select subgroup_id, remaining_units::integer as remaining_units, unit_cost_cents::integer as unit_cost_cents
+       from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400`,
+      [priceGroupId],
+    ));
+    expect(restored.rows).toEqual([{ subgroup_id: originalSubgroupId, remaining_units: 5, unit_cost_cents: 400 }]);
+
+    const retry = await callSaleItems(db, ownerId, requestId, items);
+    expect(retry).toMatchObject({ saleId, undoAvailable: false, totalCents: sale.totalCents });
+    await expect(callUndo(db, ownerId, saleId)).resolves.toEqual(firstUndo);
+    await expect(asUser(db, ownerId, async () => db.query(
+      'select subgroup_id, remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ))).resolves.toMatchObject({ rows: [{ subgroup_id: originalSubgroupId, remaining_units: 5 }] });
+  });
+
+  it('rejects undo and hides retry eligibility at exactly the 30-second deadline', async () => {
+    const requestId = 'undo-exact-boundary';
+    const items = [{ priceGroupId, units: 1 }];
+    const sale = await callSaleItems(db, ownerId, requestId, items);
+    const saleId = Number(sale.saleId);
+
+    await db.exec('begin');
+    try {
+      await db.query(
+        "update public.store_sales set sold_at = now() - interval '30 seconds' where id = $1::bigint",
+        [saleId],
+      );
+      await db.query("select set_config('request.jwt.claim.sub', $1, true)", [ownerId]);
+      await db.exec('set role authenticated');
+      const { rows } = await db.query(
+        'select public.complete_store_sale($1::jsonb, $2::text) as receipt',
+        [JSON.stringify(items), requestId],
+      );
+      expect(columnValue(rows[0], 'receipt')).toMatchObject({ saleId, undoAvailable: false });
+      await expect(db.query('select public.undo_store_sale($1::bigint)', [saleId]))
+        .rejects.toMatchObject({ code: 'P0001' });
+    } finally {
+      await db.exec('rollback');
+      await db.exec('reset role');
+    }
+
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ remaining_units: number }>(
+      'select remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    expect(rows).toEqual([{ remaining_units: 1 }]);
+  });
+
+  it('does not advertise undo on an idempotent retry by another seller or after expiry', async () => {
+    const requestId = 'undo-retry-window';
+    const items = [{ priceGroupId, units: 1 }];
+    const sale = await callSaleItems(db, ownerId, requestId, items);
+    expect(sale).toHaveProperty('undoAvailable', true);
+
+    const staffRetry = await callSaleItems(db, staffId, requestId, items);
+    expect(staffRetry).toMatchObject({ saleId: sale.saleId, undoAvailable: false });
+    expect(staffRetry).not.toHaveProperty('costTotalCents');
+
+    await db.query(
+      "update public.store_sales set sold_at = now() - interval '31 seconds' where id = $1::bigint",
+      [Number(sale.saleId)],
+    );
+    const expiredRetry = await callSaleItems(db, ownerId, requestId, items);
+    expect(expiredRetry).toMatchObject({ saleId: sale.saleId, undoAvailable: false });
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ remaining_units: number }>(
+      'select remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    expect(rows).toEqual([{ remaining_units: 1 }]);
+  });
+
+  it('allows a seller to undo their own sale but not another seller\'s sale', async () => {
+    const ownerSale = await callSale(db, ownerId, 'owner-undo-sale-1', priceGroupId);
+    const saleId = Number(ownerSale.saleId);
+    await expect(callUndo(db, staffId, saleId)).rejects.toMatchObject({ code: '42501' });
+    const afterDenied = await asUser(db, ownerId, async () => db.query<{ remaining_units: number }>(
+      'select remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    expect(afterDenied.rows).toEqual([{ remaining_units: 1 }]);
+    await expect(callUndo(db, ownerId, saleId)).resolves.toMatchObject({ status: 'undone', unitsRestored: 1 });
+
+    const staffSale = await callSale(db, staffId, 'staff-undo-sale-1', priceGroupId);
+    expect(staffSale).toHaveProperty('undoAvailable', true);
+    expect(staffSale).not.toHaveProperty('costTotalCents');
+    const staffUndo = await callUndo(db, staffId, Number(staffSale.saleId));
+    expect(staffUndo).toMatchObject({ status: 'undone', unitsRestored: 1 });
+    expect(staffUndo).not.toHaveProperty('costTotalCents');
+    expect(staffUndo).not.toHaveProperty('unitCostCents');
+    await expect(callTodaySummary(db, ownerId)).resolves.toMatchObject({ totalCents: 0, unitsSold: 0 });
+  });
+
+  it('grants sale undo only to authenticated callers', async () => {
+    const { rows } = await db.query(
+      `select
+        has_function_privilege('anon', 'public.undo_store_sale(bigint)', 'execute') as anon_execute,
+        has_function_privilege('authenticated', 'public.undo_store_sale(bigint)', 'execute') as authenticated_execute`,
+    );
+    expect(rows[0]).toEqual({ anon_execute: false, authenticated_execute: true });
+    await expect(callUndo(db, outsiderId, 1)).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('rejects an expired undo window without changing stock or net sales', async () => {
+    const sale = await callSale(db, ownerId, 'expired-undo-sale', priceGroupId);
+    const saleId = Number(sale.saleId);
+    await db.query(
+      "update public.store_sales set sold_at = now() - interval '1 minute' where id = $1::bigint",
+      [saleId],
+    );
+
+    await expect(callUndo(db, ownerId, saleId)).rejects.toMatchObject({ code: 'P0001' });
+    const { rows } = await asUser(db, ownerId, async () => db.query<{ remaining_units: number }>(
+      'select remaining_units::integer as remaining_units from public.list_store_stock_subgroups($1::bigint) where unit_cost_cents = 400',
+      [priceGroupId],
+    ));
+    expect(rows).toEqual([{ remaining_units: 1 }]);
+    await expect(callTodaySummary(db, ownerId)).resolves.toMatchObject({ totalCents: 1000, unitsSold: 1 });
   });
 
   it('does not grant authenticated users direct execution of private sale helpers', async () => {
