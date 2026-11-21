@@ -282,7 +282,8 @@ export function SaleScreen() {
   const colors = { color: theme.colors.text };
 
   return (
-    <Screen contentContainerStyle={styles.content}>
+    <View style={[styles.screenRoot, { backgroundColor: theme.colors.background }]}>
+      <Screen contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={[styles.title, colors, { fontFamily: theme.typography.serifFamily }]}>Venta</Text>
         {isOwner ? <>
@@ -300,13 +301,6 @@ export function SaleScreen() {
           </Text>
         </> : null}
       </View> : null}
-      {undoNotice ? <SaleUndoNotification
-        key={undoNotice.saleId}
-        expiresAt={undoNotice.expiresAt}
-        busy={undoBusy || saleWriteBusy}
-        onUndo={() => void undoSale(undoNotice.saleId)}
-        onHide={hideUndoNotice}
-      /> : null}
       {undoConfirmation ? <Toast message="Venta deshecha." onHide={hideUndoConfirmation} /> : null}
       {error ? <StoreMessage message={error} error /> : null}
       {loading ? <ActivityIndicator color={theme.colors.primary} /> : null}
@@ -381,10 +375,29 @@ export function SaleScreen() {
           {category !== null && !stock.some((item) => item.categoryId === category) ? <StoreMessage message="Esta categoría no tiene grupos. Configúralos desde Tienda." /> : null}
         </View>
       </> : null}
-    </Screen>
+      </Screen>
+      {undoNotice ? <View pointerEvents="box-none" style={styles.undoNoticeOverlay}>
+        <SaleUndoNotification
+          key={undoNotice.saleId}
+          expiresAt={undoNotice.expiresAt}
+          busy={undoBusy || saleWriteBusy}
+          onUndo={() => void undoSale(undoNotice.saleId)}
+          onHide={hideUndoNotice}
+        />
+      </View> : null}
+    </View>
   );
 }
 const styles = StyleSheet.create({
+  screenRoot: { flex: 1 },
+  undoNoticeOverlay: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 24,
+    zIndex: 20,
+    elevation: 20,
+  },
   priceOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   priceOption: { minHeight: 48, padding: 14, borderWidth: 1, flexGrow: 1, alignItems: 'center' },
   priceInput: { minHeight: 52, borderWidth: 1, paddingHorizontal: 14, fontSize: 22 },
