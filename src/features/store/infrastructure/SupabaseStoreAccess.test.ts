@@ -21,6 +21,8 @@ const migrations = [
   '20261115130000_owner_stock_catalog_crud.sql',
   '20261115140000_stock_subgroup_adjustments.sql',
   '20261120100000_sale_undo.sql',
+  '20261121100000_reactivate_archived_store_price_groups.sql',
+  '20261121120000_reactivate_archived_store_categories.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;

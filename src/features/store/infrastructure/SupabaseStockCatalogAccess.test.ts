@@ -17,6 +17,8 @@ const migrations = [
   '20261115110000_list_store_stock_subgroups.sql',
   '20261115120000_sale_cost_subgroups.sql',
   '20261115130000_owner_stock_catalog_crud.sql',
+  '20261121100000_reactivate_archived_store_price_groups.sql',
+  '20261121120000_reactivate_archived_store_categories.sql',
 ];
 
 type JsonRecord = Record<string, unknown>;
@@ -196,6 +198,37 @@ describe('Supabase stock catalog RPC role boundaries', () => {
     ]);
   });
 
+  it('reactivates an archived same-price group when stock is added', async () => {
+    const categoryId = Number((await db.query<{ category_id: number }>(
+      'select category_id::integer as category_id from public.store_price_groups where id = $1::bigint',
+      [priceGroupId],
+    )).rows[0].category_id);
+    const archived = await asUser(db, ownerId, async () => {
+      const { rows } = await db.query('select public.delete_store_price_group($1::bigint) as result', [priceGroupId]);
+      return columnValue(rows[0], 'result') as JsonRecord;
+    });
+    expect(archived).toMatchObject({ id: priceGroupId, status: 'archived', adjustedUnits: 2 });
+
+    const photoPath = `${businessId}/restored-example.jpg`;
+    const { rows } = await asUser(db, ownerId, async () => db.query(
+      'select public.add_store_stock($1::bigint, $2::bigint, $3::integer, $4::bigint, $5::text) as result',
+      [categoryId, 1000, 3, 250, photoPath],
+    ));
+    expect(columnValue(rows[0], 'result')).toMatchObject({
+      id: priceGroupId,
+      categoryId,
+      priceCents: 1000,
+      stockUnits: 3,
+      photoPath,
+    });
+
+    const subgroups = await asUser(db, ownerId, () => db.query(
+      'select * from public.list_store_stock_subgroups($1::bigint)', [priceGroupId],
+    ));
+    expect(subgroups.rows).toHaveLength(1);
+    expect(subgroups.rows[0]).toMatchObject({ remaining_units: 3, unit_cost_cents: 250 });
+  });
+
   it('deletes a stock-bearing group by recording adjustment-out and archiving it', async () => {
     const { rows } = await asUser(db, ownerId, async () => db.query(
       'select public.delete_store_price_group($1::bigint) as result', [priceGroupId],
@@ -237,6 +270,49 @@ describe('Supabase stock catalog RPC role boundaries', () => {
       .toMatchObject({ is_active: false });
     expect((await db.query('select is_active, stock_units from public.store_price_groups where id = $1::bigint', [priceGroupId])).rows[0])
       .toMatchObject({ is_active: false, stock_units: 0 });
+  });
+
+  it('reactivates an archived category by name and keeps its history-backed group', async () => {
+    const categoryId = Number((await db.query<{ category_id: number }>(
+      'select category_id::integer as category_id from public.store_price_groups where id = $1::bigint',
+      [priceGroupId],
+    )).rows[0].category_id);
+    const archived = await asUser(db, ownerId, async () => {
+      const { rows } = await db.query('select public.delete_store_category($1::bigint) as result', [categoryId]);
+      return columnValue(rows[0], 'result') as JsonRecord;
+    });
+    expect(archived).toMatchObject({ id: categoryId, status: 'archived', adjustedUnits: 2 });
+
+    const { rows } = await asUser(db, ownerId, async () => db.query(
+      'select public.create_store_category($1::text) as result', ['Test category'],
+    ));
+    expect(columnValue(rows[0], 'result')).toMatchObject({ id: categoryId, name: 'Test category', sortOrder: 0 });
+
+    const stock = await asUser(db, ownerId, async () => {
+      const { rows: stockRows } = await db.query(
+        'select public.add_store_stock($1::bigint, $2::bigint, $3::integer, $4::bigint, $5::text) as result',
+        [categoryId, 1000, 1, 100, null],
+      );
+      return columnValue(stockRows[0], 'result') as JsonRecord;
+    });
+    expect(stock).toMatchObject({ id: priceGroupId, categoryId, priceCents: 1000, stockUnits: 1 });
+  });
+
+  it('rejects an already active category name without changing the category list', async () => {
+    const before = await asUser(db, ownerId, () => db.query(
+      'select id, name, is_active from public.store_categories where business_id = $1::uuid order by id',
+      [businessId],
+    ));
+
+    await expect(asUser(db, ownerId, () => db.query(
+      'select public.create_store_category($1::text)', ['Test category'],
+    ))).rejects.toMatchObject({ code: '23505' });
+
+    const after = await asUser(db, ownerId, () => db.query(
+      'select id, name, is_active from public.store_categories where business_id = $1::uuid order by id',
+      [businessId],
+    ));
+    expect(after.rows).toEqual(before.rows);
   });
 
   it('archives a category and retires its remaining groups with adjustment movements', async () => {
